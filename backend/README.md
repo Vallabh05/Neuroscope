@@ -38,9 +38,14 @@ Model weights are intentionally excluded from Git. Obtain the
 `brats_mri_segmentation` bundle from the
 [official MONAI Model Zoo entry](https://github.com/Project-MONAI/model-zoo/tree/dev/models/brats_mri_segmentation),
 review the bundle's `LICENSE` and `docs/data_license.txt`, and place the
-extracted bundle under `models/brats_mri_segmentation/`. The checkpoint
-expected by the future inference implementation is
-`models/brats_mri_segmentation/models/model.pt`.
+extracted bundle under `models/brats_mri_segmentation/`. The Phase 1 inference
+service loads the local TorchScript file at
+`models/brats_mri_segmentation/models/model.ts`. The bundle's standard
+`inference.json` describes loading the `model.pt` state dictionary into
+SegResNet; the service instead uses the existing local TorchScript artifact
+as requested. Supply a compatible licensed `model.ts` separately, because
+model artifacts are ignored by Git. Create one `InferenceService` instance
+and reuse it; initialization loads the model into memory.
 
 The currently present local bundle identifies itself as version 0.5.1 and was
 created for MONAI 1.3.1 and PyTorch 2.2.2. Verify compatibility before using
