@@ -1,0 +1,47 @@
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+htmlcov/
+
+# Local environment variables and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+id_rsa
+id_ed25519
+
+# MRI data and generated files
+*.nii
+*.nii.gz
+/backend/data/
+/backend/uploads/
+/backend/outputs/
+/backend/eval/
+uploads/
+outputs/
+
+# Model weights and downloaded model archives
+*.pt
+*.pth
+/backend/models/brats_mri_segmentation/models/model.ts
+/backend/models/*.zip
+
+# IDE and operating system files
+.vscode/
+.idea/
+.vs/
+.DS_Store
+Thumbs.db
+desktop.ini
