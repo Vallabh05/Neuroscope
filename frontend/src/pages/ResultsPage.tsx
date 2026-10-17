@@ -5,7 +5,7 @@ import { OrthogonalSliceViewer } from '../components/slices/OrthogonalSliceViewe
 import { MeasurementsPanel } from '../components/measurements/MeasurementsPanel';
 import { VerificationPanel } from '../components/verification/VerificationPanel';
 import { ExportActions } from '../components/export/ExportActions';
-import { voxelToWorld } from '../utils/coordinates';
+import { voxelToWorld, worldToVoxel } from '../utils/coordinates';
 
 interface ResultsPageProps {
   result: SegmentationResult;
@@ -51,6 +51,19 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
         opacity,
       },
     }));
+  };
+
+  const handleSelectWorldPos = (world: [number, number, number]) => {
+    const voxel = worldToVoxel(world, result.affine);
+    const clampedVoxel: [number, number, number] = [
+      Math.max(0, Math.min(result.dimensions[0] - 1, Math.round(voxel[0]))),
+      Math.max(0, Math.min(result.dimensions[1] - 1, Math.round(voxel[1]))),
+      Math.max(0, Math.min(result.dimensions[2] - 1, Math.round(voxel[2]))),
+    ];
+    setCoords({
+      world,
+      voxel: clampedVoxel,
+    });
   };
 
   return (
@@ -116,6 +129,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
                 regions={regions}
                 onToggleRegion={handleToggleRegion}
                 onChangeOpacity={handleChangeOpacity}
+                onSelectWorldPos={handleSelectWorldPos}
               />
             </div>
 
@@ -137,6 +151,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
               regions={regions}
               onToggleRegion={handleToggleRegion}
               onChangeOpacity={handleChangeOpacity}
+              onSelectWorldPos={handleSelectWorldPos}
             />
           </div>
         ) : (

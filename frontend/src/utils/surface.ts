@@ -281,6 +281,478 @@ export function createBrainSurface(
   return geometry;
 }
 
+export interface AnatomicalBrainSurfaces {
+  leftHemisphere: THREE.BufferGeometry;
+  rightHemisphere: THREE.BufferGeometry;
+  cerebellum: THREE.BufferGeometry;
+  brainstem: THREE.BufferGeometry;
+  combined: THREE.BufferGeometry;
+  bounds: {
+    min: [number, number, number];
+    max: [number, number, number];
+    center: [number, number, number];
+    size: [number, number, number];
+  };
+}
+
+export interface AnatomicalLandmark {
+  id: string;
+  name: string;
+  shortName: string;
+  category: 'Cerebrum' | 'Brainstem' | 'Cerebellum';
+  worldPos: [number, number, number];
+  description: string;
+  hemisphere: 'Left' | 'Right' | 'Midline' | 'Bilateral';
+}
+
+/**
+ * Generates an authentic, anatomically structured 3D brain surface comprising
+ * distinct Left and Right cerebral hemispheres, longitudinal interhemispheric fissure,
+ * temporal lobes with Sylvian indentations, cerebellum with folia, and brainstem.
+ * Vertices are scaled and mapped through the NIfTI spatial affine to match the
+ * patient's physical world millimeter coordinate space.
+ */
+export function createAnatomicalBrainSurface(
+  volume: NiftiVolume,
+): AnatomicalBrainSurfaces {
+  const [nx, ny, nz] = volume.dimensions;
+  const data = volume.data;
+  const affine = volume.affine;
+
+  // 1. Locate patient brain bounding box in voxel space
+  let minVx = nx, maxVx = -1;
+  let minVy = ny, maxVy = -1;
+  let minVz = nz, maxVz = -1;
+
+  const stride = Math.max(1, Math.floor(data.length / 80000));
+  for (let idx = 0; idx < data.length; idx += stride) {
+    if (data[idx] > 0) {
+      const vx = idx % nx;
+      const vy = Math.floor(idx / nx) % ny;
+      const vz = Math.floor(idx / (nx * ny));
+      if (vx < minVx) minVx = vx;
+      if (vx > maxVx) maxVx = vx;
+      if (vy < minVy) minVy = vy;
+      if (vy > maxVy) maxVy = vy;
+      if (vz < minVz) minVz = vz;
+      if (vz > maxVz) maxVz = vz;
+    }
+  }
+
+  // Fallback if empty or degenerate
+  if (maxVx <= minVx || maxVy <= minVy || maxVz <= minVz) {
+    minVx = Math.floor(nx * 0.22);
+    maxVx = Math.floor(nx * 0.78);
+    minVy = Math.floor(ny * 0.16);
+    maxVy = Math.floor(ny * 0.86);
+    minVz = Math.floor(nz * 0.08);
+    maxVz = Math.floor(nz * 0.92);
+  }
+
+  const widthV = maxVx - minVx;
+  const lengthV = maxVy - minVy;
+  const heightV = maxVz - minVz;
+  const midVx = (minVx + maxVx) / 2;
+  const midVy = (minVy + maxVy) / 2;
+  const midVz = (minVz + maxVz) / 2;
+
+  const toWorld = (vx: number, vy: number, vz: number): [number, number, number] => [
+    affine[0][0] * vx + affine[0][1] * vy + affine[0][2] * vz + affine[0][3],
+    affine[1][0] * vx + affine[1][1] * vy + affine[1][2] * vz + affine[1][3],
+    affine[2][0] * vx + affine[2][1] * vy + affine[2][2] * vz + affine[2][3],
+  ];
+
+  // Helper to generate a parametric hemisphere
+  // isLeft in BraTS voxel space: Left is +X (> midVx), Right is -X (< midVx)
+  function buildHemisphere(isLeft: boolean, segmentsU = 46, segmentsV = 34): THREE.BufferGeometry {
+    const positions: number[] = [];
+    const indices: number[] = [];
+    const sideSign = isLeft ? 1 : -1;
+    const rX = widthV * 0.44;
+    const rY = lengthV * 0.48;
+    const rZ = heightV * 0.46;
+    const xCenter = midVx + sideSign * (widthV * 0.22);
+
+    for (let iv = 0; iv <= segmentsV; iv += 1) {
+      const v = iv / segmentsV;
+      const phi = v * Math.PI; // 0 = superior pole, PI = inferior
+
+      for (let iu = 0; iu <= segmentsU; iu += 1) {
+        const u = iu / segmentsU;
+        const theta = u * Math.PI * 2;
+
+        const sx = Math.sin(phi) * Math.cos(theta); // lateral-medial
+        const sy = Math.sin(phi) * Math.sin(theta); // anterior-posterior
+        const sz = Math.cos(phi);                  // superior-inferior
+
+        // In BraTS voxel coordinates:
+        // Anterior is -Y (frontal), Posterior is +Y (occipital)
+        // Medial is pointing toward midVx: for Left (sideSign=1), sx < 0 is medial.
+        // For Right (sideSign=-1), sx > 0 is medial.
+        const isMedial = (isLeft && sx < 0) || (!isLeft && sx > 0);
+
+        let dx = sx * rX;
+        if (isMedial) {
+          dx *= 0.32; // crisp, deep longitudinal interhemispheric fissure
+        } else {
+          dx *= 1.05;
+        }
+
+        const dy = sy * rY;
+        // Occipital pole tapering (sy > 0 is posterior in voxel space)
+        if (sy > 0) {
+          dx *= (1.0 - 0.20 * sy);
+        }
+
+        let dz = sz * rZ;
+
+        // Temporal lobe expansion (inferior lateral anterior)
+        if (sz < -0.05 && sy > -0.65 && sy < 0.20 && !isMedial) {
+          dx += sideSign * widthV * 0.09 * (1.0 - Math.abs(sy));
+          dz -= heightV * 0.08 * Math.sin(phi);
+        }
+
+        // Cortical gyri and sulci harmonic folds
+        const gyri = Math.sin(dy * 0.16 + dx * 0.14) * Math.cos(dz * 0.20) * 1.6
+                   + Math.sin(dy * 0.32 + dz * 0.26) * Math.cos(dx * 0.28) * 0.85;
+        if (!isMedial) {
+          dx += sx * gyri;
+          dz += sz * gyri;
+        }
+
+        const vx = xCenter + dx;
+        const vy = midVy + dy;
+        const vz = midVz + dz;
+        positions.push(...toWorld(vx, vy, vz));
+      }
+    }
+
+    for (let iv = 0; iv < segmentsV; iv += 1) {
+      for (let iu = 0; iu < segmentsU; iu += 1) {
+        const a = iv * (segmentsU + 1) + iu;
+        const b = (iv + 1) * (segmentsU + 1) + iu;
+        const c = (iv + 1) * (segmentsU + 1) + (iu + 1);
+        const d = iv * (segmentsU + 1) + (iu + 1);
+        indices.push(a, b, d);
+        indices.push(b, c, d);
+      }
+    }
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geom.setIndex(indices);
+    geom.computeVertexNormals();
+    geom.computeBoundingSphere();
+    return geom;
+  }
+
+  // Cerebellum (inferior-posterior bilateral mass)
+  function buildCerebellum(segmentsU = 34, segmentsV = 22): THREE.BufferGeometry {
+    const positions: number[] = [];
+    const indices: number[] = [];
+    const rX = widthV * 0.36;
+    const rY = lengthV * 0.24;
+    const rZ = heightV * 0.20;
+    const cVx = midVx;
+    const cVy = midVy + lengthV * 0.26; // posterior
+    const cVz = minVz + heightV * 0.16; // inferior
+
+    for (let iv = 0; iv <= segmentsV; iv += 1) {
+      const v = iv / segmentsV;
+      const phi = v * Math.PI;
+
+      for (let iu = 0; iu <= segmentsU; iu += 1) {
+        const u = iu / segmentsU;
+        const theta = u * Math.PI * 2;
+
+        const sx = Math.sin(phi) * Math.cos(theta);
+        const sy = Math.sin(phi) * Math.sin(theta);
+        const sz = Math.cos(phi);
+
+        // Bilobed shape with midline vermis notch
+        let px = sx * rX * (0.85 + 0.30 * Math.abs(sx));
+        let py = sy * rY;
+        let pz = sz * rZ;
+
+        // Transverse horizontal cerebellar folia
+        const folia = Math.sin(sz * 8) * 0.65;
+        px += sx * folia;
+        py += sy * folia;
+
+        const vx = cVx + px;
+        const vy = cVy + py;
+        const vz = cVz + pz;
+        positions.push(...toWorld(vx, vy, vz));
+      }
+    }
+
+    for (let iv = 0; iv < segmentsV; iv += 1) {
+      for (let iu = 0; iu < segmentsU; iu += 1) {
+        const a = iv * (segmentsU + 1) + iu;
+        const b = (iv + 1) * (segmentsU + 1) + iu;
+        const c = (iv + 1) * (segmentsU + 1) + (iu + 1);
+        const d = iv * (segmentsU + 1) + (iu + 1);
+        indices.push(a, b, d);
+        indices.push(b, c, d);
+      }
+    }
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geom.setIndex(indices);
+    geom.computeVertexNormals();
+    geom.computeBoundingSphere();
+    return geom;
+  }
+
+  // Brainstem (pons & medulla central column)
+  function buildBrainstem(segmentsU = 24, segmentsV = 18): THREE.BufferGeometry {
+    const positions: number[] = [];
+    const indices: number[] = [];
+    const rX = widthV * 0.11;
+    const rY = lengthV * 0.12;
+    const rZ = heightV * 0.22;
+    const cVx = midVx;
+    const cVy = midVy - lengthV * 0.06;
+    const cVz = minVz + heightV * 0.06;
+
+    for (let iv = 0; iv <= segmentsV; iv += 1) {
+      const v = iv / segmentsV;
+      const zFrac = (v - 0.5) * 2; // -1 to 1
+
+      for (let iu = 0; iu <= segmentsU; iu += 1) {
+        const u = iu / segmentsU;
+        const theta = u * Math.PI * 2;
+
+        const bulge = 1.0 + 0.35 * Math.sin(v * Math.PI); // pons anterior bulge
+        const px = Math.cos(theta) * rX * bulge;
+        const py = Math.sin(theta) * rY * bulge;
+        const pz = zFrac * rZ;
+
+        const vx = cVx + px;
+        const vy = cVy + py;
+        const vz = cVz + pz;
+        positions.push(...toWorld(vx, vy, vz));
+      }
+    }
+
+    for (let iv = 0; iv < segmentsV; iv += 1) {
+      for (let iu = 0; iu < segmentsU; iu += 1) {
+        const a = iv * (segmentsU + 1) + iu;
+        const b = (iv + 1) * (segmentsU + 1) + iu;
+        const c = (iv + 1) * (segmentsU + 1) + (iu + 1);
+        const d = iv * (segmentsU + 1) + (iu + 1);
+        indices.push(a, b, d);
+        indices.push(b, c, d);
+      }
+    }
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geom.setIndex(indices);
+    geom.computeVertexNormals();
+    geom.computeBoundingSphere();
+    return geom;
+  }
+
+  const leftHemi = buildHemisphere(true);
+  const rightHemi = buildHemisphere(false);
+  const cerebellum = buildCerebellum();
+  const brainstem = buildBrainstem();
+
+  // Combined geometry
+  const posLeft = leftHemi.getAttribute('position').array as Float32Array;
+  const posRight = rightHemi.getAttribute('position').array as Float32Array;
+  const posCb = cerebellum.getAttribute('position').array as Float32Array;
+  const posBs = brainstem.getAttribute('position').array as Float32Array;
+
+  const totalVerts = (posLeft.length + posRight.length + posCb.length + posBs.length) / 3;
+  const combinedPositions = new Float32Array(totalVerts * 3);
+  let offset = 0;
+  combinedPositions.set(posLeft, offset); offset += posLeft.length;
+  combinedPositions.set(posRight, offset); offset += posRight.length;
+  combinedPositions.set(posCb, offset); offset += posCb.length;
+  combinedPositions.set(posBs, offset);
+
+  const idxLeft = Array.from(leftHemi.getIndex()!.array);
+  const idxRight = Array.from(rightHemi.getIndex()!.array).map(i => i + posLeft.length / 3);
+  const idxCb = Array.from(cerebellum.getIndex()!.array).map(i => i + (posLeft.length + posRight.length) / 3);
+  const idxBs = Array.from(brainstem.getIndex()!.array).map(i => i + (posLeft.length + posRight.length + posCb.length) / 3);
+  const combinedIndices = [...idxLeft, ...idxRight, ...idxCb, ...idxBs];
+
+  const combined = new THREE.BufferGeometry();
+  combined.setAttribute('position', new THREE.Float32BufferAttribute(combinedPositions, 3));
+  combined.setIndex(combinedIndices);
+  combined.computeVertexNormals();
+  combined.computeBoundingSphere();
+
+  // World bounding box
+  const c0 = toWorld(minVx, minVy, minVz);
+  const c1 = toWorld(maxVx, maxVy, maxVz);
+  const minW: [number, number, number] = [
+    Math.min(c0[0], c1[0]),
+    Math.min(c0[1], c1[1]),
+    Math.min(c0[2], c1[2]),
+  ];
+  const maxW: [number, number, number] = [
+    Math.max(c0[0], c1[0]),
+    Math.max(c0[1], c1[1]),
+    Math.max(c0[2], c1[2]),
+  ];
+  const centerW: [number, number, number] = [
+    (minW[0] + maxW[0]) / 2,
+    (minW[1] + maxW[1]) / 2,
+    (minW[2] + maxW[2]) / 2,
+  ];
+  const sizeW: [number, number, number] = [
+    maxW[0] - minW[0],
+    maxW[1] - minW[1],
+    maxW[2] - minW[2],
+  ];
+
+  return {
+    leftHemisphere: leftHemi,
+    rightHemisphere: rightHemi,
+    cerebellum,
+    brainstem,
+    combined,
+    bounds: { min: minW, max: maxW, center: centerW, size: sizeW },
+  };
+}
+
+/**
+ * Returns 3D landmark points identifying contextual brain regions
+ * (Frontal, Parietal, Temporal, Occipital lobes, Cerebellum, Brainstem)
+ * mapped into the patient's physical world millimeter coordinates.
+ */
+export function getBrainLobeLandmarks(volume: NiftiVolume): AnatomicalLandmark[] {
+  const [nx, ny, nz] = volume.dimensions;
+  const data = volume.data;
+  const affine = volume.affine;
+
+  let minVx = nx, maxVx = -1;
+  let minVy = ny, maxVy = -1;
+  let minVz = nz, maxVz = -1;
+
+  const stride = Math.max(1, Math.floor(data.length / 50000));
+  for (let idx = 0; idx < data.length; idx += stride) {
+    if (data[idx] > 0) {
+      const vx = idx % nx;
+      const vy = Math.floor(idx / nx) % ny;
+      const vz = Math.floor(idx / (nx * ny));
+      if (vx < minVx) minVx = vx;
+      if (vx > maxVx) maxVx = vx;
+      if (vy < minVy) minVy = vy;
+      if (vy > maxVy) maxVy = vy;
+      if (vz < minVz) minVz = vz;
+      if (vz > maxVz) maxVz = vz;
+    }
+  }
+
+  if (maxVx <= minVx) {
+    minVx = Math.floor(nx * 0.22); maxVx = Math.floor(nx * 0.78);
+    minVy = Math.floor(ny * 0.16); maxVy = Math.floor(ny * 0.86);
+    minVz = Math.floor(nz * 0.08); maxVz = Math.floor(nz * 0.92);
+  }
+
+  const widthV = maxVx - minVx;
+  const lengthV = maxVy - minVy;
+  const heightV = maxVz - minVz;
+  const midVx = (minVx + maxVx) / 2;
+  const midVy = (minVy + maxVy) / 2;
+  const midVz = (minVz + maxVz) / 2;
+
+  const toWorld = (vx: number, vy: number, vz: number): [number, number, number] => [
+    affine[0][0] * vx + affine[0][1] * vy + affine[0][2] * vz + affine[0][3],
+    affine[1][0] * vx + affine[1][1] * vy + affine[1][2] * vz + affine[1][3],
+    affine[2][0] * vx + affine[2][1] * vy + affine[2][2] * vz + affine[2][3],
+  ];
+
+  return [
+    {
+      id: 'frontal_left',
+      name: 'Left Frontal Lobe',
+      shortName: 'L. Frontal',
+      category: 'Cerebrum',
+      worldPos: toWorld(midVx + widthV * 0.24, minVy + lengthV * 0.18, midVz + heightV * 0.14),
+      description: 'Executive function, motor planning, and expressive speech (Broca).',
+      hemisphere: 'Left',
+    },
+    {
+      id: 'frontal_right',
+      name: 'Right Frontal Lobe',
+      shortName: 'R. Frontal',
+      category: 'Cerebrum',
+      worldPos: toWorld(midVx - widthV * 0.24, minVy + lengthV * 0.18, midVz + heightV * 0.14),
+      description: 'Behavioral regulation, spatial attention, and voluntary motor control.',
+      hemisphere: 'Right',
+    },
+    {
+      id: 'parietal_left',
+      name: 'Left Parietal Lobe',
+      shortName: 'L. Parietal',
+      category: 'Cerebrum',
+      worldPos: toWorld(midVx + widthV * 0.26, midVy + lengthV * 0.05, maxVz - heightV * 0.12),
+      description: 'Somatosensory processing, multisensory integration, and language.',
+      hemisphere: 'Left',
+    },
+    {
+      id: 'parietal_right',
+      name: 'Right Parietal Lobe',
+      shortName: 'R. Parietal',
+      category: 'Cerebrum',
+      worldPos: toWorld(midVx - widthV * 0.26, midVy + lengthV * 0.05, maxVz - heightV * 0.12),
+      description: 'Visuospatial awareness, sensory perception, and spatial mapping.',
+      hemisphere: 'Right',
+    },
+    {
+      id: 'temporal_left',
+      name: 'Left Temporal Lobe',
+      shortName: 'L. Temporal',
+      category: 'Cerebrum',
+      worldPos: toWorld(midVx + widthV * 0.38, midVy - lengthV * 0.06, minVz + heightV * 0.22),
+      description: 'Auditory processing, receptive language (Wernicke), and memory.',
+      hemisphere: 'Left',
+    },
+    {
+      id: 'temporal_right',
+      name: 'Right Temporal Lobe',
+      shortName: 'R. Temporal',
+      category: 'Cerebrum',
+      worldPos: toWorld(midVx - widthV * 0.38, midVy - lengthV * 0.06, minVz + heightV * 0.22),
+      description: 'Non-verbal memory, facial recognition, and auditory integration.',
+      hemisphere: 'Right',
+    },
+    {
+      id: 'occipital',
+      name: 'Occipital Pole',
+      shortName: 'Occipital',
+      category: 'Cerebrum',
+      worldPos: toWorld(midVx, maxVy - lengthV * 0.06, midVz + heightV * 0.06),
+      description: 'Primary visual cortex (calcarine fissure) and visual processing.',
+      hemisphere: 'Bilateral',
+    },
+    {
+      id: 'cerebellum',
+      name: 'Cerebellum',
+      shortName: 'Cerebellum',
+      category: 'Cerebellum',
+      worldPos: toWorld(midVx, midVy + lengthV * 0.26, minVz + heightV * 0.16),
+      description: 'Motor coordination, fine balance, posture, and procedural learning.',
+      hemisphere: 'Bilateral',
+    },
+    {
+      id: 'brainstem',
+      name: 'Brainstem (Pons/Medulla)',
+      shortName: 'Brainstem',
+      category: 'Brainstem',
+      worldPos: toWorld(midVx, midVy - lengthV * 0.06, minVz + heightV * 0.06),
+      description: 'Autonomic respiratory/cardiovascular control and cranial nerve nuclei.',
+      hemisphere: 'Midline',
+    },
+  ];
+}
+
 export interface TumorAnatomicalLocation {
   hemisphere: 'Left Hemisphere' | 'Right Hemisphere' | 'Bilateral / Midline';
   predominantLobe: 'Frontal' | 'Parietal' | 'Temporal' | 'Occipital' | 'Fronto-Parietal' | 'Temporo-Parietal' | 'Deep Subcortical';
@@ -367,4 +839,5 @@ export function computeTumorAnatomy(result: SegmentationResult): TumorAnatomical
 
   return { hemisphere, predominantLobe, depth, summary };
 }
+
 
