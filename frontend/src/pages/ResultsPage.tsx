@@ -23,15 +23,14 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
     ) as [number, number, number];
     return {
       voxel: initVoxel,
-      world: voxelToWorld(initVoxel, result.affine)
+      world: voxelToWorld(initVoxel, result.affine),
     };
   });
 
   // Region controls (WT, TC, ET)
   const [regions, setRegions] = useState(result.volumes);
 
-  // Active view layout tab for desktop / mobile:
-  // 'both' (split view: 3D + 2D Slices), '3d' (only 3D), 'slices' (only 2D slices)
+  // Active view layout tab: 'both' | '3d' | 'slices'
   const [viewMode, setViewMode] = useState<'both' | '3d' | 'slices'>('both');
 
   const handleToggleRegion = (id: 'wt' | 'tc' | 'et') => {
@@ -39,8 +38,8 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
       ...prev,
       [id]: {
         ...prev[id],
-        visible: !prev[id].visible
-      }
+        visible: !prev[id].visible,
+      },
     }));
   };
 
@@ -49,57 +48,66 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
       ...prev,
       [id]: {
         ...prev[id],
-        opacity
-      }
+        opacity,
+      },
     }));
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 space-y-6 animate-fade-in">
-      {/* Main View Mode Selector */}
-      <div className="flex items-center justify-between pb-1">
-        <div className="flex items-center space-x-2 text-xs text-slate-300">
-          <span className="font-semibold text-white">Visualisation Mode:</span>
-          <div className="flex items-center space-x-1 bg-neuro-900 p-1 rounded-xl border border-neuro-800">
+    <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 space-y-5 animate-fade-in font-sans">
+      {/* Vercel-style Clean Viewport Mode Selector */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-1 gap-3">
+        <div className="flex items-center space-x-2 text-xs">
+          <span className="font-medium text-neutral-400 font-sans">Viewport:</span>
+          <div className="flex items-center space-x-0.5 bg-[#0A0A0A] p-0.5 rounded border border-[#222222]">
             <button
+              type="button"
               onClick={() => setViewMode('both')}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                viewMode === 'both' ? 'bg-cyan-600 text-white font-semibold shadow-sm' : 'text-slate-400 hover:text-white'
+              className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
+                viewMode === 'both'
+                  ? 'bg-[#222222] text-white font-medium'
+                  : 'text-neutral-400 hover:text-white'
               }`}
             >
-              Interactive Split (3D + 2D Slices)
+              Split (3D + 2D)
             </button>
             <button
+              type="button"
               onClick={() => setViewMode('3d')}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                viewMode === '3d' ? 'bg-cyan-600 text-white font-semibold shadow-sm' : 'text-slate-400 hover:text-white'
+              className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
+                viewMode === '3d'
+                  ? 'bg-[#222222] text-white font-medium'
+                  : 'text-neutral-400 hover:text-white'
               }`}
             >
-              3D Surface Only
+              3D Surface
             </button>
             <button
+              type="button"
               onClick={() => setViewMode('slices')}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                viewMode === 'slices' ? 'bg-cyan-600 text-white font-semibold shadow-sm' : 'text-slate-400 hover:text-white'
+              className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
+                viewMode === 'slices'
+                  ? 'bg-[#222222] text-white font-medium'
+                  : 'text-neutral-400 hover:text-white'
               }`}
             >
-              Orthogonal Slices Only
+              Orthogonal Slices
             </button>
           </div>
         </div>
 
-        {/* Co-registered coordinate indicator */}
-        <div className="hidden md:flex items-center space-x-3 text-xs font-mono bg-neuro-900/80 px-3 py-1.5 rounded-xl border border-neuro-800">
-          <span className="text-slate-400">Position:</span>
-          <span className="text-cyan-300">Voxel [{coords.voxel.join(', ')}]</span>
-          <span className="text-cyan-300">World [{coords.world.map(value => value.toFixed(1)).join(', ')}] mm</span>
+        {/* Global Position Indicator */}
+        <div className="flex items-center space-x-3 text-xs font-mono bg-[#0A0A0A] px-3 py-1 rounded border border-[#222222]">
+          <span className="text-neutral-500">Position:</span>
+          <span className="text-white font-medium">Voxel [{coords.voxel.join(', ')}]</span>
+          <span className="text-neutral-300">World [{coords.world.map(v => v.toFixed(1)).join(', ')}] mm</span>
         </div>
       </div>
 
       {/* Primary Visualisation Region */}
-      <div className="space-y-6">
+      <div>
         {viewMode === 'both' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
             {/* 3D Brain Viewer: 5 cols */}
             <div className="lg:col-span-5 h-[540px]">
               <ThreeBrainViewer
@@ -111,7 +119,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
               />
             </div>
 
-            {/* Linked 2D Slices: 7 cols */}
+            {/* Linked 2D Orthogonal Slices: 7 cols */}
             <div className="lg:col-span-7">
               <OrthogonalSliceViewer
                 result={result}
@@ -122,7 +130,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
             </div>
           </div>
         ) : viewMode === '3d' ? (
-          <div className="h-[650px] w-full">
+          <div className="h-[640px] w-full">
             <ThreeBrainViewer
               result={result}
               activeWorldPos={coords.world}
@@ -153,10 +161,10 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
         onChangeOpacity={handleChangeOpacity}
       />
 
-      {/* Verification & Limitations Trust Audit Panel */}
+      {/* Verification & Trust Audit Panel */}
       <VerificationPanel result={result} />
 
-      {/* Export Actions (Download mask, report, new case) */}
+      {/* Export Actions (PDF, CSV, NIfTI, JSON) */}
       <ExportActions
         result={result}
         onStartNewCase={onStartNewCase}
@@ -164,3 +172,5 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
     </div>
   );
 };
+
+export default ResultsPage;

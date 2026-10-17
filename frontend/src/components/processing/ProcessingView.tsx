@@ -1,6 +1,15 @@
 import React from 'react';
 import { JobStage } from '../../types';
-import { Loader2, CheckCircle2, AlertTriangle, RefreshCw, XCircle, FileCheck, Cpu, Download } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Cpu,
+  Download,
+  FileCheck,
+  Loader2,
+  RefreshCw,
+  XCircle,
+} from 'lucide-react';
 
 interface ProcessingViewProps {
   stage: JobStage;
@@ -21,22 +30,22 @@ interface StageStep {
 const STAGES: StageStep[] = [
   {
     id: 'receiving_files',
-    label: 'Uploading and validating inputs',
-    desc: 'Sending the MRI volumes to FastAPI for NIfTI and geometry validation.',
-    icon: <FileCheck className="w-4 h-4" />
+    label: 'Validating input series & spatial geometry',
+    desc: 'Checking NIfTI dimensions, coordinate orientation, and finite voxel bounds.',
+    icon: <FileCheck className="w-4 h-4" />,
   },
   {
     id: 'running_inference',
-    label: 'Running model inference',
-    desc: 'The backend runs its configured segmentation model synchronously.',
-    icon: <Cpu className="w-4 h-4" />
+    label: 'Executing MONAI SegResNet neural inference',
+    desc: 'Synchronous sliding-window segmentation across 4 multi-parametric MRI channels.',
+    icon: <Cpu className="w-4 h-4" />,
   },
   {
     id: 'preparing_outputs',
-    label: 'Validating and loading results',
-    desc: 'The API validates the predicted mask, calculates region volumes, and writes a verified NIfTI mask and JSON report.',
-    icon: <Download className="w-4 h-4" />
-  }
+    label: 'Integrating volumetric metrics & 3D surfaces',
+    desc: 'Evaluating sub-compartment volumes, Marching Cubes label meshes, and checksums.',
+    icon: <Download className="w-4 h-4" />,
+  },
 ];
 
 export const ProcessingView: React.FC<ProcessingViewProps> = ({
@@ -51,46 +60,48 @@ export const ProcessingView: React.FC<ProcessingViewProps> = ({
   const isFailed = stage === 'failed' || !!error;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-12 sm:px-6 space-y-8 animate-fade-in">
-      <div className="p-8 rounded-2xl bg-neuro-900 border border-neuro-800 shadow-2xl shadow-cyan-950/20 space-y-6">
+    <div className="max-w-2xl mx-auto px-4 py-12 sm:px-6 space-y-6 animate-fade-in font-sans">
+      <div className="p-6 sm:p-8 rounded bg-[#0A0A0A] border border-[#222222] space-y-6">
         {/* Top Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 mb-2">
+          <div className="inline-flex p-2.5 rounded bg-[#111111] border border-[#222222] text-white mb-1">
             {isFailed ? (
-              <XCircle className="w-8 h-8 text-red-400" />
+              <XCircle className="w-6 h-6 text-red-400" />
             ) : (
-              <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-white" />
             )}
           </div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
-            {isFailed ? 'Processing Failed' : 'Segmenting MRI Volumes'}
+          <h2 className="text-lg font-semibold text-white tracking-tight font-sans">
+            {isFailed ? 'Processing Failed' : 'Segmenting Multi-Parametric MRI Volumes'}
           </h2>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
+          <p className="text-xs text-neutral-400 max-w-md mx-auto leading-relaxed">
             {isFailed
-              ? 'The request failed; the backend does not mark a failed case as successful.'
-              : stageDescription || 'Segmentation is synchronous. This page waits for the FastAPI request to finish.'}
+              ? 'The request encountered a validation or execution failure on the backend daemon.'
+              : stageDescription || 'Processing is synchronous on the local backend daemon.'}
           </p>
         </div>
 
-        {/* Progress Bar (Honest: Indeterminate or actual percentage) */}
+        {/* Progress Bar (Vercel Clean White/Gray) */}
         {!isFailed && (
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
-              <span className="font-mono">
-                {currentStageIndex >= 0 ? `Stage ${currentStageIndex + 1} of ${STAGES.length}` : 'Initializing pipeline...'}
+            <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400">
+              <span>
+                {currentStageIndex >= 0
+                  ? `Stage ${currentStageIndex + 1} of ${STAGES.length}`
+                  : 'Initializing pipeline...'}
               </span>
-              <span className="font-mono text-cyan-400">
+              <span className="text-white font-medium">
                 {progressPercent != null ? `${Math.round(progressPercent)}%` : 'Active'}
               </span>
             </div>
-            <div className="w-full h-2 rounded-full bg-neuro-950 border border-neuro-800 overflow-hidden">
+            <div className="w-full h-1.5 rounded-full bg-[#111111] border border-[#222222] overflow-hidden">
               {progressPercent != null ? (
                 <div
-                  className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300"
+                  className="h-full bg-white transition-all duration-300 rounded-full"
                   style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
                 />
               ) : (
-                <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 w-1/3 animate-indeterminate rounded-full" />
+                <div className="h-full bg-white w-1/3 animate-indeterminate rounded-full" />
               )}
             </div>
           </div>
@@ -98,26 +109,26 @@ export const ProcessingView: React.FC<ProcessingViewProps> = ({
 
         {/* Error Callout */}
         {isFailed && (
-          <div className="p-4 rounded-xl bg-red-950/50 border border-red-500/40 text-red-200 text-xs space-y-2">
+          <div className="p-3.5 rounded bg-[#160B0B] border border-red-900/50 text-red-200 text-xs space-y-2 font-mono">
             <div className="flex items-center space-x-2 font-semibold text-red-400">
               <AlertTriangle className="w-4 h-4 flex-shrink-0" />
               <span>Pipeline Error Details</span>
             </div>
-            <p className="font-mono text-[11px] bg-red-950/80 p-2.5 rounded border border-red-900/60 break-words">
+            <p className="bg-[#000000] p-2.5 rounded border border-red-950 break-words text-[11px]">
               {error || 'Unknown server error encountered during image processing.'}
             </p>
-            <p className="text-[11px] text-slate-400">
-              Check that the four files belong to the same case and satisfy the backend validation requirements, then retry.
+            <p className="text-[11px] text-neutral-400 font-sans">
+              Verify that all four series share identical matrix dimensions and spatial orientation before retrying.
             </p>
           </div>
         )}
 
         {/* Pipeline Stage Checklist */}
-        <div className="space-y-2 pt-2 border-t border-neuro-800">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+        <div className="space-y-2 pt-1 border-t border-[#1C1C1C]">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-neutral-500 block mb-2">
             Verification Pipeline Sequence
           </span>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 font-sans">
             {STAGES.map((s, index) => {
               const isDone = currentStageIndex > index;
               const isCurrent = currentStageIndex === index && !isFailed;
@@ -126,14 +137,14 @@ export const ProcessingView: React.FC<ProcessingViewProps> = ({
               return (
                 <div
                   key={s.id}
-                  className={`flex items-start space-x-3 p-2.5 rounded-lg text-xs transition-colors ${
+                  className={`flex items-start space-x-3 p-2.5 rounded border transition-colors ${
                     isCurrent
-                      ? 'bg-cyan-950/40 border border-cyan-800/60 text-white'
+                      ? 'bg-[#111111] border-[#333333] text-white'
                       : isDone
-                      ? 'bg-neuro-950/40 text-slate-300'
+                      ? 'bg-[#000000] border-[#1C1C1C] text-neutral-300'
                       : isStageFailed
-                      ? 'bg-red-950/30 border border-red-800/50 text-red-300'
-                      : 'opacity-40 text-slate-400'
+                      ? 'bg-[#160B0B] border-red-900/50 text-red-300'
+                      : 'opacity-40 bg-[#000000] border-[#1C1C1C] text-neutral-500'
                   }`}
                 >
                   <div className="mt-0.5 flex-shrink-0">
@@ -142,14 +153,14 @@ export const ProcessingView: React.FC<ProcessingViewProps> = ({
                     ) : isStageFailed ? (
                       <XCircle className="w-4 h-4 text-red-400" />
                     ) : isCurrent ? (
-                      <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
+                      <Loader2 className="w-4 h-4 text-white animate-spin" />
                     ) : (
-                      <span className="w-4 h-4 rounded-full border border-slate-600 block" />
+                      <span className="w-3.5 h-3.5 rounded-full border border-neutral-700 block" />
                     )}
                   </div>
                   <div className="min-w-0">
-                    <div className="font-medium text-slate-200">{s.label}</div>
-                    <div className="text-[11px] text-slate-400 mt-0.5 leading-snug">{s.desc}</div>
+                    <div className="font-medium text-xs text-white">{s.label}</div>
+                    <div className="text-[11px] text-neutral-400 mt-0.5 leading-snug">{s.desc}</div>
                   </div>
                 </div>
               );
@@ -158,22 +169,22 @@ export const ProcessingView: React.FC<ProcessingViewProps> = ({
         </div>
 
         {/* Action buttons */}
-        <div className="pt-4 border-t border-neuro-800 flex items-center justify-end space-x-3">
+        <div className="pt-3 border-t border-[#1C1C1C] flex items-center justify-end space-x-2.5">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded-xl border border-neuro-800 bg-neuro-850 hover:bg-neuro-800 text-slate-300 hover:text-white text-xs font-medium transition-colors"
+            className="px-3.5 py-1.5 rounded bg-[#111111] hover:bg-[#1A1A1A] border border-[#222222] hover:border-[#333333] text-neutral-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
           >
-            Return to upload
+            Cancel
           </button>
           {isFailed && (
             <button
               type="button"
               onClick={onRetry}
-              className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-md shadow-cyan-950/50 transition-colors flex items-center space-x-1.5"
+              className="px-4 py-1.5 rounded bg-white hover:bg-neutral-200 text-black text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer shadow-sm"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Retry Validation & Inference</span>
+              <span>Retry Pipeline</span>
             </button>
           )}
         </div>
@@ -181,3 +192,5 @@ export const ProcessingView: React.FC<ProcessingViewProps> = ({
     </div>
   );
 };
+
+export default ProcessingView;

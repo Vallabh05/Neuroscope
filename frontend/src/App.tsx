@@ -169,7 +169,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-neuro-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#000000] text-[#EDEDED] flex flex-col font-sans antialiased selection:bg-neutral-800 selection:text-white">
       <Header
         onOpenAbout={() => setIsAboutOpen(true)}
         isBackendConnected={isBackendConnected}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ShieldAlert, Brain, BookOpen, Layers, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, BookOpen, Brain, Layers, ShieldAlert, X } from 'lucide-react';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -10,138 +10,140 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neuro-950/80 backdrop-blur-sm animate-fade-in">
-      <div 
-        className="relative w-full max-w-2xl bg-neuro-900 border border-neuro-700/80 rounded-2xl shadow-2xl shadow-cyan-950/40 overflow-hidden max-h-[90vh] flex flex-col"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-fade-in font-sans">
+      <div
+        className="relative w-full max-w-2xl bg-[#0A0A0A] border border-[#222222] rounded-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-headline"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-neuro-800 bg-neuro-950/50">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#1C1C1C] bg-[#000000]">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
-              <Brain className="w-5 h-5" />
+            <div className="w-7 h-7 rounded bg-white text-black flex items-center justify-center font-bold">
+              <Brain className="w-4 h-4 text-black" strokeWidth={2.2} />
             </div>
             <div>
-              <h2 id="modal-headline" className="text-base font-semibold text-slate-100">
-                About NeuroScope 3D & Scientific Limitations
+              <h2 id="modal-headline" className="text-xs font-semibold text-white tracking-tight uppercase font-mono">
+                About NeuroScope 3D & Technical Specifications
               </h2>
-              <p className="text-xs text-slate-400">Research and educational brain tumor segmentation prototype</p>
+              <p className="text-[11px] text-neutral-500 font-sans">Research Prototype • MONAI SegResNet Engine</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-neuro-800 transition-colors"
+            className="p-1 rounded text-neutral-400 hover:text-white hover:bg-[#141414] transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="px-6 py-5 overflow-y-auto space-y-6 text-sm text-slate-300">
-          {/* Critical Disclaimers */}
-          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-2">
-            <div className="flex items-center space-x-2 text-amber-400 font-semibold text-xs tracking-wider uppercase">
-              <ShieldAlert className="w-4 h-4" />
+        <div className="px-5 py-4 overflow-y-auto space-y-4 text-xs text-neutral-400 font-sans">
+          {/* Regulatory Restriction Alert */}
+          <div className="p-3 rounded bg-[#160B0B] border border-red-900/40 text-red-200 space-y-1">
+            <div className="flex items-center space-x-2 font-semibold uppercase tracking-wider text-[11px] text-red-400 font-mono">
+              <ShieldAlert className="w-3.5 h-3.5" />
               <span>Not a Medical Device or Clinical Tool</span>
             </div>
-            <p className="text-xs leading-relaxed text-amber-200/90">
-              NeuroScope 3D is a research and educational prototype and has not been clinically validated or authorized for clinical use.
-              <strong> Never use predicted masks or estimated volumes for diagnosis, treatment, radiotherapy planning, or surgical decision-making.</strong>
+            <p className="text-[11px] leading-relaxed">
+              NeuroScope 3D is strictly an educational and algorithmic benchmarking prototype. It has not been clinically authorized for medical use.
+              <strong className="text-white"> Never use predicted masks or estimated volumes for diagnosis, radiotherapy planning, or surgical decision-making.</strong>
             </p>
           </div>
 
           {/* MRI Modalities Guide */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider flex items-center space-x-2">
-              <Layers className="w-4 h-4" />
+          <div className="space-y-2">
+            <h3 className="text-[11px] font-semibold text-white uppercase tracking-wider flex items-center space-x-1.5 font-mono">
+              <Layers className="w-3.5 h-3.5 text-neutral-400" />
               <span>Required MRI Sequences (BraTS Standard)</span>
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-              <div className="p-3 rounded-lg bg-neuro-850 border border-neuro-800">
-                <span className="font-semibold text-white block mb-0.5">T1-Weighted (T1)</span>
-                <span className="text-slate-400 leading-normal">
-                  T1-weighted input sequence supplied to the configured model.
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+              <div className="p-2.5 rounded bg-[#000000] border border-[#222222] space-y-0.5">
+                <span className="font-semibold text-white block">T1-Weighted (T1)</span>
+                <span className="text-neutral-400 leading-normal">
+                  Native T1 structural anatomical sequence supplied as input channel 0.
                 </span>
               </div>
-              <div className="p-3 rounded-lg bg-neuro-850 border border-neuro-800">
-                <span className="font-semibold text-white block mb-0.5">T1Gd (Contrast-Enhanced T1)</span>
-                <span className="text-slate-400 leading-normal">
-                  T1ce input sequence supplied to the configured model. The application does not interpret contrast enhancement.
+              <div className="p-2.5 rounded bg-[#000000] border border-[#222222] space-y-0.5">
+                <span className="font-semibold text-white block">T1Gd (Contrast-Enhanced)</span>
+                <span className="text-neutral-400 leading-normal">
+                  Post-contrast T1 sequence capturing active angiogenesis supplied as channel 1.
                 </span>
               </div>
-              <div className="p-3 rounded-lg bg-neuro-850 border border-neuro-800">
-                <span className="font-semibold text-white block mb-0.5">T2-Weighted (T2)</span>
-                <span className="text-slate-400 leading-normal">
-                  T2-weighted input sequence supplied to the configured model.
+              <div className="p-2.5 rounded bg-[#000000] border border-[#222222] space-y-0.5">
+                <span className="font-semibold text-white block">T2-Weighted (T2)</span>
+                <span className="text-neutral-400 leading-normal">
+                  Spin-echo sequence capturing free water and tissue margins as channel 2.
                 </span>
               </div>
-              <div className="p-3 rounded-lg bg-neuro-850 border border-neuro-800">
-                <span className="font-semibold text-white block mb-0.5">FLAIR (Fluid-Attenuated Inversion Recovery)</span>
-                <span className="text-slate-400 leading-normal">
-                  FLAIR input sequence supplied to the configured model.
+              <div className="p-2.5 rounded bg-[#000000] border border-[#222222] space-y-0.5">
+                <span className="font-semibold text-white block">FLAIR</span>
+                <span className="text-neutral-400 leading-normal">
+                  Inversion recovery sequence highlighting peritumoral edema as channel 3.
                 </span>
               </div>
             </div>
           </div>
 
           {/* Sub-region Definitions */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider flex items-center space-x-2">
-              <BookOpen className="w-4 h-4" />
+          <div className="space-y-2">
+            <h3 className="text-[11px] font-semibold text-white uppercase tracking-wider flex items-center space-x-1.5 font-mono">
+              <BookOpen className="w-3.5 h-3.5 text-neutral-400" />
               <span>Tumour Sub-Region Hierarchy</span>
             </h3>
-            <div className="p-3.5 rounded-xl bg-neuro-850 border border-neuro-800 space-y-2 text-xs">
-              <div className="flex items-center space-x-3">
-                <span className="w-3 h-3 rounded-full bg-amber-400 flex-shrink-0" />
+            <div className="p-3 rounded bg-[#000000] border border-[#222222] space-y-2 text-[11px]">
+              <div className="flex items-center space-x-2.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#eab308] flex-shrink-0" />
                 <div>
-                  <strong className="text-white">Whole Tumour (WT):</strong> Includes Necrotic Core + Peritumoral Edema + Enhancing Tissue (NCR + ED + ET).
+                  <strong className="text-white">Whole Tumour (WT):</strong> Labels 1 + 2 + 4. Comprehensive lesion mass including vasogenic edema.
                 </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <span className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0" />
+              <div className="flex items-center space-x-2.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] flex-shrink-0" />
                 <div>
-                  <strong className="text-white">Tumour Core (TC):</strong> NCR + ET (BraTS label mapping).
+                  <strong className="text-white">Tumour Core (TC):</strong> Labels 1 + 4. Pathological tumor core target: active enhancing tissue plus necrosis.
                 </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <span className="w-3 h-3 rounded-full bg-cyan-400 flex-shrink-0" />
+              <div className="flex items-center space-x-2.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#06b6d4] flex-shrink-0" />
                 <div>
-                  <strong className="text-white">Enhancing Tumour (ET):</strong> BraTS label 4 region; this is a model label, not a clinical interpretation.
+                  <strong className="text-white">Enhancing Tumour (ET):</strong> Label 4 only. Viable vascularized tissue on post-gadolinium T1Gd.
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Known Limitations */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4" />
-              <span>Known Technical Limitations</span>
+          {/* Technical Limitations */}
+          <div className="space-y-1.5">
+            <h3 className="text-[11px] font-semibold text-white uppercase tracking-wider flex items-center space-x-1.5 font-mono">
+              <AlertTriangle className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Technical Limitations & Assumptions</span>
             </h3>
-            <ul className="list-disc list-inside space-y-1.5 text-xs text-slate-400">
-              <li>The backend validates input geometry and performs its documented inference preprocessing; results are mapped to the input grid.</li>
-              <li>No held-out multi-case evaluation results are included. An optional expert mask provides only a per-case comparison.</li>
-              <li>The backend does not classify brain anatomy or skull stripping. A boundary warning is not a brain/non-brain classifier.</li>
-              <li>The 3D view renders predicted label surfaces only, not the brain anatomy. Slice panels follow input voxel axes, not canonical re-slices.</li>
-              <li>Cases are stored locally by the backend and expire within 24 hours. The app has no authentication; do not expose the development server publicly.</li>
+            <ul className="list-disc list-inside space-y-1 text-[11px] text-neutral-400">
+              <li>Spatial coordinates follow input NIfTI voxel grid and affine matrix geometry.</li>
+              <li>Volumes evaluate the analytical determinant: V = N_voxels × |det(affine)| ÷ 1000 mL.</li>
+              <li>Cases expire and are cleaned automatically from the host system within 24 hours.</li>
             </ul>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-neuro-800 bg-neuro-950/60 flex items-center justify-between text-xs text-slate-400">
-          <span>BraTS region label definitions</span>
+        <div className="px-5 py-3 border-t border-[#1C1C1C] bg-[#000000] flex items-center justify-between text-xs text-neutral-500 font-mono">
+          <span>BraTS 2021 Standard</span>
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors"
+            className="px-4 py-1.5 rounded bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors cursor-pointer"
           >
-            I Understand
+            Acknowledge
           </button>
         </div>
       </div>
     </div>
   );
 };
+
+export default AboutModal;

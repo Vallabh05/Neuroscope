@@ -86,36 +86,38 @@ export const ExportActions: React.FC<ExportActionsProps> = ({
   };
 
   return (
-    <div className="bg-neuro-900 rounded-2xl border border-neuro-800 p-5 space-y-4 shadow-xl">
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-        <div className="space-y-1 text-center lg:text-left">
+    <div className="bg-[#0A0A0A] rounded border border-[#222222] p-4 space-y-3 font-sans">
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-3">
+        <div className="space-y-0.5 text-center lg:text-left">
           <div className="flex items-center justify-center lg:justify-start gap-2">
-            <h4 className="text-base font-bold text-slate-100">Export & Download Clinical Reports</h4>
-            <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-800/40 px-2 py-0.5 rounded-full">
-              PDF • CSV • NIfTI
+            <h4 className="text-xs font-semibold text-white tracking-tight">
+              Export & Download Artifacts
+            </h4>
+            <span className="text-[10px] font-mono text-neutral-400 bg-[#141414] border border-[#262626] px-1.5 py-0.5 rounded">
+              PDF • CSV • NIfTI • JSON
             </span>
           </div>
-          <p className="text-xs text-slate-400">
-            Download professional clinical PDF reports, structured CSV metrics, or raw NIfTI label masks.
+          <p className="text-[11px] text-neutral-500">
+            Download clinical PDF reports, structured CSV metrics, or raw NIfTI label masks.
           </p>
         </div>
 
         {/* Action Buttons Group */}
-        <div className="flex flex-wrap items-center gap-2.5 justify-center lg:justify-end">
-          {/* Download PDF Report */}
+        <div className="flex flex-wrap items-center gap-2 justify-center lg:justify-end">
+          {/* Download PDF Report: Vercel Signature Solid White */}
           <button
             type="button"
             onClick={downloadPdf}
             disabled={downloading !== null}
-            className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-600/20 transition-all hover:scale-[1.02] disabled:opacity-50"
+            className="px-3.5 py-1.5 rounded bg-white hover:bg-neutral-200 text-black text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
             title="Download formatted clinical and volumetric analysis report as PDF"
           >
             {downloading === 'pdf' ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <FileText className="w-4 h-4" />
+              <FileText className="w-3.5 h-3.5" />
             )}
-            Download PDF Report (.pdf)
+            <span>PDF Report</span>
           </button>
 
           {/* Download CSV Report */}
@@ -123,15 +125,15 @@ export const ExportActions: React.FC<ExportActionsProps> = ({
             type="button"
             onClick={downloadCsv}
             disabled={downloading !== null}
-            className="px-4 py-2.5 rounded-xl bg-neuro-850 hover:bg-neuro-800 border border-emerald-600/40 text-emerald-300 text-xs font-semibold flex items-center gap-2 transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 rounded bg-[#111111] hover:bg-[#1A1A1A] border border-[#262626] hover:border-[#333333] text-neutral-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
             title="Download structured spreadsheet report with all volumetric metrics"
           >
             {downloading === 'csv' ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <FileSpreadsheet className="w-3.5 h-3.5" />
             )}
-            Download CSV (.csv)
+            <span>CSV Table</span>
           </button>
 
           {/* Download Mask (.nii.gz) */}
@@ -139,15 +141,15 @@ export const ExportActions: React.FC<ExportActionsProps> = ({
             type="button"
             onClick={downloadMask}
             disabled={downloading !== null}
-            className="px-3.5 py-2.5 rounded-xl bg-neuro-850 hover:bg-neuro-800 border border-neuro-700 text-slate-200 text-xs font-semibold flex items-center gap-2 transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 rounded bg-[#111111] hover:bg-[#1A1A1A] border border-[#222222] hover:border-[#333333] text-neutral-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
             title="Download 3D verified NIfTI label mask (.nii.gz)"
           >
             {downloading === 'mask' ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <Download className="w-4 h-4 text-cyan-400" />
+              <Download className="w-3.5 h-3.5 text-neutral-400" />
             )}
-            Mask (.nii.gz)
+            <span>Mask (.nii.gz)</span>
           </button>
 
           {/* Download JSON Passport */}
@@ -155,36 +157,38 @@ export const ExportActions: React.FC<ExportActionsProps> = ({
             type="button"
             onClick={downloadJson}
             disabled={downloading !== null}
-            className="px-3 py-2.5 rounded-xl bg-neuro-850 hover:bg-neuro-800 border border-neuro-750 text-slate-400 hover:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            className="px-2.5 py-1.5 rounded bg-[#111111] hover:bg-[#1A1A1A] border border-[#222222] text-neutral-400 hover:text-white text-xs font-mono transition-colors disabled:opacity-50 cursor-pointer"
             title="Download raw Integrity Passport JSON for audit trail"
           >
             {downloading === 'json' ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <FileJson className="w-3.5 h-3.5 text-slate-400" />
+              <FileJson className="w-3.5 h-3.5" />
             )}
-            JSON
+            <span>JSON</span>
           </button>
 
           {/* Delete case and start new */}
           <button
             type="button"
             onClick={onStartNewCase}
-            className="px-3.5 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-950/70 border border-red-800/60 text-red-300 text-xs font-semibold flex items-center gap-2 transition-colors"
-            title="Delete this case from the backend and return to the upload form"
+            className="px-3 py-1.5 rounded bg-[#111111] hover:bg-[#1A1A1A] border border-[#222222] text-neutral-400 hover:text-red-400 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Purge active study and return to upload form"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            New Case
+            <span>New Case</span>
           </button>
         </div>
       </div>
 
       {error && (
-        <div role="alert" className="p-3 rounded-lg bg-red-950/50 border border-red-500/40 text-xs text-red-300 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-          {error}
+        <div role="alert" className="p-2.5 rounded bg-[#160B0B] border border-red-900/40 text-xs text-red-300 flex items-center gap-2 font-mono">
+          <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+          <span>{error}</span>
         </div>
       )}
     </div>
   );
 };
+
+export default ExportActions;
