@@ -84,11 +84,12 @@ Set optional environment variables in PowerShell before starting Uvicorn:
 | `NEUROSCOPE_MAX_UPLOAD_BYTES_TOTAL` | `134217728` | Maximum bytes across the upload |
 | `NEUROSCOPE_MAX_VOXELS` | `10000000` | Maximum 3D voxel count per modality |
 | `NEUROSCOPE_CASE_RETENTION_SECONDS` | `86400` | Maximum local case lifetime; values above 24 hours are rejected |
-| `NEUROSCOPE_CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated explicit browser origins; wildcard is rejected |
+| `NEUROSCOPE_CORS_ORIGINS` | Vite on port 5173 and local port 3000 origins | Comma-separated explicit browser origins; wildcard is rejected |
 
 Example:
 
 ```powershell
+$env:NEUROSCOPE_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 $env:NEUROSCOPE_MAX_UPLOAD_BYTES_PER_FILE = "67108864"
 $env:NEUROSCOPE_MAX_UPLOAD_BYTES_TOTAL = "134217728"
 $env:NEUROSCOPE_CASE_RETENTION_SECONDS = "86400"

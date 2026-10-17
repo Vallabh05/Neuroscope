@@ -149,6 +149,26 @@ def test_health_and_ready_endpoints(test_client):
     }
 
 
+@pytest.mark.parametrize(
+    "origin",
+    ("http://localhost:5173", "http://127.0.0.1:5173"),
+)
+def test_default_cors_allows_vite_origins(tmp_path, origin):
+    settings = ApiSettings(backend_root=tmp_path, data_root=tmp_path / "cases")
+    client = TestClient(create_app(settings, inference_service=FakeInference()))
+
+    response = client.options(
+        "/health",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+
+
 def test_readiness_reports_missing_model_without_paths(tmp_path):
     settings = ApiSettings(
         backend_root=tmp_path,

@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from typing import Mapping
 
 import nibabel as nib
@@ -157,12 +157,25 @@ def load_and_validate_modalities(
             raise MRIValidationError(
                 f"{modality}: image is constant and contains no usable intensity variation"
             )
-        if any(
+        touches_boundary = any(
             np.any(np.take(data, edge, axis=axis) != 0)
             for axis in range(3)
             for edge in (0, -1)
-        ):
+        )
+        if touches_boundary:
             warnings.append(f"foreground_touches_volume_boundary:{modality}")
+            warnings.append(
+                f"input_sanity_warning:{modality} - Foreground touches image boundary; scan may not be skull-stripped."
+            )
+
+        voxel_vol_ml = abs(float(np.linalg.det(affine[:3, :3]))) / 1000.0
+        nonzero_count = int(np.count_nonzero(data != 0))
+        foreground_ml = nonzero_count * voxel_vol_ml
+        if foreground_ml > 2200.0:
+            warnings.append(
+                f"input_sanity_warning:{modality} - Physical foreground volume ({foreground_ml:.1f} mL) "
+                "exceeds standard human cranial capacity. Scan may not be a brain MRI."
+            )
 
         images[modality] = image
         arrays[modality] = data

@@ -88,6 +88,8 @@ class ApiSettings:
     max_voxels: int = DEFAULT_MAX_VOXELS
     case_retention_seconds: int = _DEFAULT_CASE_RETENTION_SECONDS
     cors_origins: tuple[str, ...] = (
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     )
@@ -131,7 +133,10 @@ class ApiSettings:
         model_path_value = os.getenv("NEUROSCOPE_MODEL_PATH")
         origins_value = os.getenv(
             "NEUROSCOPE_CORS_ORIGINS",
-            "http://localhost:3000,http://127.0.0.1:3000",
+            (
+                "http://localhost:5173,http://127.0.0.1:5173,"
+                "http://localhost:3000,http://127.0.0.1:3000"
+            ),
         )
         try:
             max_file_bytes = int(

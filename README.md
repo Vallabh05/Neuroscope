@@ -1,12 +1,14 @@
 # NeuroScope 3D
 
 NeuroScope 3D is a research and educational prototype for 3D brain MRI
-segmentation. The repository contains a Python/FastAPI backend with MRI
+segmentation. The repository contains a React/TypeScript frontend and a Python/FastAPI backend with MRI
 validation, TorchScript inference, segmentation validation, NIfTI export,
 measurements, integrity-passport utilities, and a local MRI segmentation API
-workflow. The API accepts an optional BraTS expert mask for per-case region
-metrics, and the backend includes a standalone prediction command. A
-user-facing 3D viewer has not been added yet.
+workflow. The frontend uploads cases to that API, displays the uploaded MRI
+and predicted-mask overlays, renders 3D surfaces from predicted labels,
+reports measurements and integrity metadata, and downloads the actual mask
+and JSON report. The API accepts an optional BraTS expert mask for per-case
+region metrics.
 
 **Research prototype only: this project is not a medical device and must not
 be used for clinical diagnosis, treatment decisions, or emergency care.**
@@ -14,8 +16,9 @@ MRI validation and synthetic/model smoke tests do not establish diagnostic
 accuracy on real patient scans. The bundled model is explicitly an example
 not intended for diagnosis; the API is a research prototype, not a clinical
 decision-support tool.
-The repository does not include a 3D browser viewer or a held-out labelled
-evaluation cohort, so it does not claim the challenge's 10-patient metrics.
+The 3D scene contains predicted-label surfaces only, not a reconstructed
+brain surface. The repository does not include a held-out labelled evaluation
+cohort, so it does not claim the challenge's 10-patient metrics.
 
 ## Repository structure
 
@@ -29,12 +32,15 @@ backend/
   requirements.txt           Pinned Python dependencies
   download_sample.py         Optional MRI sample downloader
   README.md                  Backend-specific setup notes
+frontend/
+  src/                       React upload, slice, 3D, measurements and report UI
+  README.md                  Frontend setup and API configuration
 .gitignore
 README.md
 ```
 
-There is no frontend directory yet. Model weights, downloaded model archives,
-and MRI scans are deliberately not stored in Git.
+Model weights, downloaded model archives, node modules, build output, and MRI
+scans are deliberately not stored in Git.
 
 ## Backend setup (Windows PowerShell)
 
@@ -127,3 +133,32 @@ python -m pytest
 Each teammate should create their own virtual environment and obtain any
 required model weights or data separately, following the applicable license
 and access conditions.
+
+## Frontend setup (Windows PowerShell)
+
+Start the backend from `backend/`:
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+In a separate PowerShell terminal, install and start the frontend:
+
+```powershell
+cd frontend
+npm ci
+npm run dev
+```
+
+Open the local Vite address printed in the terminal (normally
+`http://127.0.0.1:5173`). The local Vite proxy forwards API requests to
+FastAPI, so no CORS override or `VITE_API_BASE_URL` setting is needed for this
+local setup. See
+[frontend/README.md](frontend/README.md) for
+setup, API configuration, and viewer limitations. The browser retains the
+selected MRI files in memory for viewing and sends them only to the configured
+FastAPI server. Backend case data is stored locally and expires automatically.
+Neither service implements authentication; keep them on a trusted local
+machine/network and do not expose the development server publicly.

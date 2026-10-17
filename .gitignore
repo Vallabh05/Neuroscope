@@ -17,6 +17,9 @@ htmlcov/
 .env
 .env.*
 !.env.example
+frontend/.env.local
+frontend/node_modules/
+frontend/dist/
 *.pem
 *.p12
 id_rsa
