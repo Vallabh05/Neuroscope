@@ -1,14 +1,6 @@
 import React, { useRef } from 'react';
 import { ModalityFile, ModalityType } from '../../types';
-import {
-  AlertCircle,
-  CheckCircle2,
-  FileText,
-  Info,
-  RefreshCw,
-  Upload,
-  X,
-} from 'lucide-react';
+import { UploadCloud, FileText, CheckCircle2, AlertCircle, X, RefreshCw, Info } from 'lucide-react';
 import { formatFileSize } from '../../utils/coordinates';
 
 interface ModalityCardProps {
@@ -72,12 +64,14 @@ export const ModalityCard: React.FC<ModalityCardProps> = ({
     <div
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      className={`relative rounded-sm border transition-colors ${
+      className={`group relative rounded-xl border transition-all duration-200 overflow-hidden ${
         hasFile
           ? modalityFile.status === 'invalid'
-            ? 'border-red-600 bg-atern-surface'
-            : 'border-atern-blue bg-atern-surface'
-          : 'border-atern-border bg-atern-surface hover:border-atern-muted'
+            ? 'border-red-500/60 bg-red-950/20 shadow-md shadow-red-950/30'
+            : modalityFile.status === 'valid'
+            ? 'border-emerald-500/60 bg-neuro-900 shadow-md shadow-emerald-950/20'
+            : 'border-cyan-600/60 bg-neuro-900/90 shadow-md shadow-cyan-950/30'
+          : 'border-neuro-800 bg-neuro-900/40 hover:border-neuro-700 hover:bg-neuro-900/70'
       }`}
     >
       <input
@@ -89,67 +83,67 @@ export const ModalityCard: React.FC<ModalityCardProps> = ({
       />
 
       {/* Card Header */}
-      <div className="p-3.5 border-b border-atern-border flex items-start justify-between">
+      <div className="p-4 border-b border-neuro-800/80 flex items-start justify-between">
         <div className="space-y-1">
           <div className="flex items-center space-x-2">
-            <span className="font-bold text-atern-text text-xs uppercase tracking-wider font-mono">
-              {title}
-            </span>
-            <span className="px-1.5 py-0.2 rounded-none text-[10px] font-mono font-bold bg-atern-bg text-atern-blue border border-atern-border">
+            <span className="font-bold text-slate-100 text-sm tracking-tight">{title}</span>
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-950/80 text-cyan-300 border border-cyan-800/50">
               {badge}
             </span>
             {isOptional && (
-              <span className="text-[10px] font-mono uppercase text-atern-muted bg-atern-bg px-1.5 py-0.2 border border-atern-border">
+              <span className="text-[10px] uppercase font-semibold text-slate-400 bg-neuro-800 px-1.5 py-0.5 rounded">
                 Optional
               </span>
             )}
           </div>
-          <p className="text-[11px] text-atern-muted leading-snug">{description}</p>
+          <p className="text-xs text-slate-400 leading-snug">{description}</p>
         </div>
 
-        {/* Status indicator badge */}
+        {/* Status indicator icon */}
         <div>
           {hasFile ? (
             modalityFile.status === 'valid' ? (
-              <span className="inline-flex items-center text-emerald-400 text-xs font-mono font-medium">
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-400" />
-                LOADED
+              <span className="inline-flex items-center text-emerald-400 text-xs font-medium" title="File verified">
+                <CheckCircle2 className="w-4 h-4 mr-1 text-emerald-400" />
+                Valid
               </span>
             ) : modalityFile.status === 'invalid' ? (
-              <span className="inline-flex items-center text-red-400 text-xs font-mono font-medium">
-                <AlertCircle className="w-3.5 h-3.5 mr-1 text-red-400" />
-                INVALID
+              <span className="inline-flex items-center text-red-400 text-xs font-medium" title={modalityFile.errorMessage}>
+                <AlertCircle className="w-4 h-4 mr-1 text-red-400" />
+                Invalid
+              </span>
+            ) : modalityFile.status === 'validating' ? (
+              <span className="inline-flex items-center text-cyan-400 text-xs font-medium animate-pulse">
+                <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
+                Checking
               </span>
             ) : (
-              <span className="inline-flex items-center text-atern-blue text-xs font-mono font-medium">
-                READY
+              <span className="inline-flex items-center text-cyan-300 text-xs font-mono">
+                Selected
               </span>
             )
           ) : (
-            <span className="text-[10px] font-mono text-atern-muted bg-atern-bg px-2 py-0.5 rounded-none border border-atern-border">
-              EMPTY
+            <span className="text-[11px] font-mono text-slate-400 bg-neuro-850 px-2 py-0.5 rounded border border-neuro-800">
+              Empty
             </span>
           )}
         </div>
       </div>
 
-      {/* Card Body: Dropzone / Selected file presentation */}
-      <div className="p-3.5 space-y-3">
+      {/* Card Body: Dropzone / Selected state */}
+      <div className="p-4">
         {hasFile ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between p-2.5 rounded-sm bg-atern-bg border border-atern-border">
-              <div className="flex items-center space-x-2.5 min-w-0 pr-2">
-                <div className="p-1.5 rounded-none bg-atern-surface text-atern-blue border border-atern-border flex-shrink-0">
+          <div className="space-y-3">
+            <div className="flex items-start justify-between p-3 rounded-lg bg-neuro-950/70 border border-neuro-800">
+              <div className="flex items-start space-x-3 min-w-0 pr-2">
+                <div className="p-2 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex-shrink-0">
                   <FileText className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <div
-                    className="text-xs font-mono font-medium text-atern-text truncate"
-                    title={modalityFile.name}
-                  >
+                  <div className="text-xs font-medium text-slate-200 truncate font-mono" title={modalityFile.name}>
                     {modalityFile.name}
                   </div>
-                  <div className="text-[10px] font-mono text-atern-muted mt-0.5">
+                  <div className="text-[11px] text-slate-400 mt-0.5">
                     {formatFileSize(modalityFile.size)}
                   </div>
                 </div>
@@ -159,7 +153,7 @@ export const ModalityCard: React.FC<ModalityCardProps> = ({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-1.5 rounded-none text-atern-muted hover:text-atern-text hover:bg-atern-surface border border-transparent hover:border-atern-border transition-colors cursor-pointer"
+                  className="p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-neuro-800 transition-colors"
                   title="Replace file"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
@@ -167,7 +161,7 @@ export const ModalityCard: React.FC<ModalityCardProps> = ({
                 <button
                   type="button"
                   onClick={() => onFileRemove(modality)}
-                  className="p-1.5 rounded-none text-atern-muted hover:text-red-400 hover:bg-atern-surface border border-transparent hover:border-atern-border transition-colors cursor-pointer"
+                  className="p-1 rounded text-slate-400 hover:text-red-400 hover:bg-red-950/40 transition-colors"
                   title="Remove file"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -175,36 +169,37 @@ export const ModalityCard: React.FC<ModalityCardProps> = ({
               </div>
             </div>
 
-            {/* Error or validation warning message */}
+            {/* Error Message if invalid */}
             {modalityFile.errorMessage && (
-              <div className="p-2.5 rounded-sm bg-amber-950/20 border border-amber-800/40 text-[11px] font-mono text-amber-300 flex items-start space-x-2">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-500/40 text-[11px] text-red-300 flex items-start space-x-2">
+                <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
                 <span>{modalityFile.errorMessage}</span>
               </div>
             )}
+
           </div>
         ) : (
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="cursor-pointer border border-dashed border-atern-border hover:border-atern-blue rounded-sm p-5 text-center transition-colors bg-atern-bg hover:bg-atern-hover flex flex-col items-center justify-center space-y-2 group"
+            className="cursor-pointer border-2 border-dashed border-neuro-800 hover:border-cyan-500/50 rounded-xl p-5 text-center transition-all bg-neuro-950/30 hover:bg-cyan-950/10 flex flex-col items-center justify-center space-y-2 group/drop"
           >
-            <div className="w-8 h-8 rounded-none bg-atern-surface text-atern-muted group-hover:text-atern-blue flex items-center justify-center border border-atern-border transition-colors">
-              <Upload className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-full bg-neuro-850 group-hover/drop:bg-cyan-500/20 text-slate-400 group-hover/drop:text-cyan-400 flex items-center justify-center transition-colors">
+              <UploadCloud className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs font-mono text-atern-text group-hover:text-atern-blue">
-                Select or drop <span className="text-atern-blue">.nii / .nii.gz</span>
+              <p className="text-xs font-medium text-slate-300 group-hover/drop:text-cyan-200">
+                Click or drag & drop <span className="font-mono text-cyan-400">.nii / .nii.gz</span>
               </p>
-              <p className="text-[10px] font-mono text-atern-muted mt-0.5">
-                Channel: {badge}
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Target: {title}
               </p>
             </div>
           </div>
         )}
 
-        {/* Clinical Note */}
-        <div className="flex items-start space-x-1.5 text-[11px] text-atern-muted bg-atern-bg p-2 rounded-sm border border-atern-border">
-          <Info className="w-3 h-3 text-atern-blue flex-shrink-0 mt-0.5" />
+        {/* Clinical Imaging Note */}
+        <div className="mt-3 flex items-start space-x-1.5 text-[11px] text-slate-400 bg-neuro-950/40 p-2 rounded-lg border border-neuro-850">
+          <Info className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
           <span className="leading-tight">{clinicalNote}</span>
         </div>
       </div>

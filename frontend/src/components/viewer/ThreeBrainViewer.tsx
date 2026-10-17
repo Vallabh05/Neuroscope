@@ -25,7 +25,7 @@ const RegionSurface: React.FC<{
       opacity={region.opacity}
       side={THREE.DoubleSide}
       depthWrite={region.opacity > 0.7}
-      roughness={0.4}
+      roughness={0.42}
     />
   </mesh>
 );
@@ -57,49 +57,38 @@ export const ThreeBrainViewer: React.FC<ThreeBrainViewerProps> = ({
   const distance = Math.max(100, extent * 1.8);
   const geometries = useMemo(() => createLabelSurfaces(result.mask), [result.mask]);
 
-  React.useEffect(
-    () => () => {
-      geometries.wt.dispose();
-      geometries.tc.dispose();
-      geometries.et.dispose();
-    },
-    [geometries]
-  );
+  React.useEffect(() => () => {
+    geometries.wt.dispose();
+    geometries.tc.dispose();
+    geometries.et.dispose();
+  }, [geometries]);
 
   return (
-    <div className="relative w-full h-full min-h-[460px] bg-atern-bg rounded-sm border border-atern-border overflow-hidden flex flex-col select-none">
-      {/* Top Overlays Toolbar: Technical Flat Bar */}
-      <div className="absolute top-2.5 left-2.5 right-2.5 z-10 flex items-center justify-between pointer-events-none">
-        <div className="pointer-events-auto flex items-center space-x-2 bg-atern-surface px-2.5 py-1 rounded-sm border border-atern-border text-xs font-mono">
-          <Layers className="w-3.5 h-3.5 text-atern-blue" />
-          <span className="font-bold text-atern-text uppercase">3D Surface View</span>
-          <span className="text-[10px] text-atern-muted">| Affine RAS mm</span>
+    <div className="relative w-full h-full min-h-[460px] bg-neuro-950 rounded-2xl border border-neuro-800 overflow-hidden flex flex-col select-none">
+      <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between pointer-events-none">
+        <div className="pointer-events-auto flex items-center space-x-2 bg-neuro-900/90 px-3 py-1.5 rounded-xl border border-neuro-800 text-xs">
+          <Layers className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="font-semibold text-slate-200">Predicted mask surface</span>
+          <span className="text-[10px] font-mono text-slate-400">| affine world mm</span>
         </div>
-        <div className="pointer-events-auto flex items-center space-x-1 bg-atern-surface p-1 rounded-sm border border-atern-border">
+        <div className="pointer-events-auto flex items-center space-x-1 bg-neuro-900/90 p-1 rounded-xl border border-neuro-800">
           <button
-            type="button"
             onClick={() => setShowCrosshair(value => !value)}
-            className={`p-1 rounded-sm transition-colors cursor-pointer ${
-              showCrosshair
-                ? 'bg-atern-blue text-white'
-                : 'text-atern-muted hover:text-atern-text hover:bg-atern-hover'
-            }`}
-            title="Toggle 3D crosshair marker"
+            className="p-1.5 rounded-lg text-cyan-300 hover:bg-neuro-800"
+            title="Toggle world-coordinate crosshair"
           >
             <Crosshair className="w-3.5 h-3.5" />
           </button>
           <button
-            type="button"
             onClick={() => setResetCameraCount(value => value + 1)}
-            className="p-1 rounded-sm text-atern-muted hover:text-atern-text hover:bg-atern-hover transition-colors cursor-pointer"
-            title="Reset 3D camera to default position"
+            className="p-1.5 rounded-lg text-slate-300 hover:bg-neuro-800"
+            title="Reset camera"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Three.js Canvas */}
       <div className="flex-1 w-full min-h-[420px] cursor-grab active:cursor-grabbing">
         <Canvas>
           <PerspectiveCamera
@@ -111,7 +100,7 @@ export const ThreeBrainViewer: React.FC<ThreeBrainViewerProps> = ({
             far={distance * 10}
           />
           <CameraReset trigger={resetCameraCount} distance={distance} />
-          <ambientLight intensity={0.8} />
+          <ambientLight intensity={0.75} />
           <directionalLight position={[extent, -extent, extent]} intensity={1.2} />
           <directionalLight position={[-extent, extent, -extent / 2]} intensity={0.45} />
           <group position={[-center[0], -center[1], -center[2]]}>
@@ -119,10 +108,14 @@ export const ThreeBrainViewer: React.FC<ThreeBrainViewerProps> = ({
             <RegionSurface geometry={geometries.tc} region={regions.tc} />
             <RegionSurface geometry={geometries.et} region={regions.et} />
             {showCrosshair && (
-              <group position={[activeWorldPos[0], activeWorldPos[1], activeWorldPos[2]]}>
+              <group position={[
+                activeWorldPos[0],
+                activeWorldPos[1],
+                activeWorldPos[2],
+              ]}>
                 <mesh>
                   <sphereGeometry args={[1.2, 12, 12]} />
-                  <meshBasicMaterial color="#1677D2" />
+                  <meshBasicMaterial color="#38bdf8" />
                 </mesh>
                 <axesHelper args={[extent * 0.55]} />
               </group>
@@ -132,27 +125,20 @@ export const ThreeBrainViewer: React.FC<ThreeBrainViewerProps> = ({
         </Canvas>
       </div>
 
-      {/* Bottom Region Visibility & Opacity Bar: Utilitarian Flat Bar */}
-      <div className="absolute bottom-2.5 left-2.5 right-2.5 z-10 pointer-events-none">
-        <div className="pointer-events-auto bg-atern-surface p-2.5 rounded-sm border border-atern-border max-w-xl mx-auto flex flex-wrap justify-between items-center gap-3 text-xs font-mono">
+      <div className="absolute bottom-3 left-3 right-3 z-10 pointer-events-none">
+        <div className="pointer-events-auto bg-neuro-900/95 p-3 rounded-2xl border border-neuro-800 shadow-xl max-w-xl mx-auto flex flex-wrap justify-between gap-3 text-xs">
           {(['wt', 'tc', 'et'] as const).map(id => (
-            <div key={id} className="flex items-center space-x-2">
+            <div key={id} className="flex items-center gap-2">
               <button
-                type="button"
                 onClick={() => onToggleRegion(id)}
-                className={`flex items-center space-x-1.5 px-2 py-1 rounded-sm border transition-colors cursor-pointer ${
-                  regions[id].visible
-                    ? 'border-atern-blue bg-atern-bg text-atern-text'
-                    : 'border-atern-border bg-atern-bg text-atern-muted'
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border ${
+                  regions[id].visible ? 'border-neuro-700 text-white' : 'border-neuro-800 text-slate-500'
                 }`}
                 title={`${regions[id].fullName}: ${regions[id].voxel_count.toLocaleString()} voxels`}
               >
-                <span
-                  className="w-2 h-2 rounded-none"
-                  style={{ backgroundColor: regions[id].color }}
-                />
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: regions[id].color }} />
                 <span className="font-bold">{regions[id].name}</span>
-                {regions[id].visible ? <Eye className="w-3 h-3 text-atern-blue" /> : <EyeOff className="w-3 h-3 text-atern-muted" />}
+                {regions[id].visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
               </button>
               <input
                 type="range"
@@ -162,16 +148,15 @@ export const ThreeBrainViewer: React.FC<ThreeBrainViewerProps> = ({
                 value={regions[id].opacity}
                 disabled={!regions[id].visible}
                 onChange={event => onChangeOpacity(id, Number(event.target.value))}
-                className="w-12 h-1 bg-atern-bg appearance-none cursor-pointer accent-atern-blue disabled:opacity-30"
+                className="w-14 accent-cyan-400 disabled:opacity-30"
                 aria-label={`${regions[id].name} opacity`}
               />
             </div>
           ))}
         </div>
       </div>
-
-      <p className="absolute bottom-14 left-2.5 right-2.5 text-center text-[10px] font-mono text-atern-muted pointer-events-none">
-        Scene visualizes predicted label boundary meshes; brain tissue contours are omitted.
+      <p className="absolute bottom-[4.8rem] left-3 right-3 text-center text-[10px] text-slate-400 pointer-events-none">
+        This scene shows the predicted label surfaces only; it is not a rendered brain anatomy.
       </p>
     </div>
   );

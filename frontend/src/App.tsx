@@ -9,13 +9,11 @@ import type {
 } from './types';
 import { apiService } from './services/api';
 import { parseNifti, assertSameGrid } from './utils/nifti';
-import { Header, AppTab } from './components/layout/Header';
+import { Header } from './components/layout/Header';
 import { AboutModal } from './components/layout/AboutModal';
-import { HomeView } from './components/home/HomeView';
 import { UploadWorkspace } from './components/upload/UploadWorkspace';
 import { ProcessingView } from './components/processing/ProcessingView';
 import { ResultsPage } from './pages/ResultsPage';
-import { ReportsView } from './components/reports/ReportsView';
 
 function region(
   id: RegionVolume['id'],
@@ -38,8 +36,7 @@ function region(
 }
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<AppTab>('home');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentView, setCurrentView] = useState<'upload' | 'processing' | 'results'>('upload');
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
@@ -69,10 +66,9 @@ export const App: React.FC = () => {
     lastSubmittedFiles.current = slots;
     const requestId = ++requestSequence.current;
     setProcessingError(null);
-    setIsProcessing(true);
-    setActiveTab('cases');
+    setCurrentView('processing');
     setProcessingStage('receiving_files');
-    setStageDescription('Uploading and validating the four MRI volumes on the backend.');
+    setStageDescription('Uploading and validating the four MRI volumes.');
 
     try {
       if (!slots.t1.file || !slots.t1gd.file || !slots.t2.file || !slots.flair.file) {
@@ -94,12 +90,12 @@ export const App: React.FC = () => {
       if (requestId !== requestSequence.current) return;
       setActiveCaseId(created.case_id);
       setProcessingStage('running_inference');
-      setStageDescription('The backend is executing MONAI SegResNet synchronous segmentation.');
+      setStageDescription('The API is running synchronous segmentation; this may take a few minutes.');
       const segmented = await apiService.segmentCase(created.case_id);
       if (requestId !== requestSequence.current) return;
 
       setProcessingStage('preparing_outputs');
-      setStageDescription('Loading verified label mask and volume geometries into workstation.');
+      setStageDescription('Loading the verified mask and uploaded MRI volumes for the viewer.');
       const [t1, t1gd, t2, flair, maskBlob, reportBlob] = await Promise.all([
         parseNifti(slots.t1.file),
         parseNifti(slots.t1gd.file),
@@ -122,9 +118,9 @@ export const App: React.FC = () => {
         voxel_spacing_mm: segmented.spacing_mm,
         affine: mask.affine,
         volumes: {
-          wt: region('wt', 'Whole tumour', '#D97706', segmented.region_volumes.whole_tumor),
-          tc: region('tc', 'Tumour core', '#DC2626', segmented.region_volumes.tumor_core),
-          et: region('et', 'Enhancing tumour', '#0284C7', segmented.region_volumes.enhancing_tumor),
+          wt: region('wt', 'Whole tumour', '#eab308', segmented.region_volumes.whole_tumor),
+          tc: region('tc', 'Tumour core', '#ef4444', segmented.region_volumes.tumor_core),
+          et: region('et', 'Enhancing tumour', '#06b6d4', segmented.region_volumes.enhancing_tumor),
         },
         modalities,
         mask,
@@ -137,8 +133,7 @@ export const App: React.FC = () => {
       };
       setSegmentationResult(result);
       setProcessingStage('completed');
-      setIsProcessing(false);
-      setActiveTab('workstation');
+      setCurrentView('results');
     } catch (error) {
       if (requestId !== requestSequence.current) return;
       const message = error instanceof Error ? error.message : 'Unexpected processing error.';
@@ -154,9 +149,8 @@ export const App: React.FC = () => {
     setSegmentationResult(null);
     setProcessingError(null);
     setProcessingStage('idle');
-    setIsProcessing(false);
     lastSubmittedFiles.current = null;
-    setActiveTab('cases');
+    setCurrentView('upload');
     if (caseId) {
       try {
         await apiService.deleteCase(caseId);
@@ -170,91 +164,43 @@ export const App: React.FC = () => {
     if (lastSubmittedFiles.current) {
       void handleStartSegmentation(lastSubmittedFiles.current);
     } else {
-      setIsProcessing(false);
-      setActiveTab('cases');
-    }
-  };
-
-  const handleOpenWorkstation = () => {
-    if (segmentationResult) {
-      setActiveTab('workstation');
-    } else {
-      setActiveTab('cases');
+      setCurrentView('upload');
     }
   };
 
   return (
-    <div className="min-h-screen bg-atern-bg text-atern-text flex flex-col font-sans antialiased selection:bg-atern-blue selection:text-white">
+    <div className="min-h-screen bg-neuro-950 text-slate-100 flex flex-col font-sans">
       <Header
-        activeTab={activeTab}
-        onTabChange={tab => {
-          if (isProcessing && tab !== 'cases') return;
-          setActiveTab(tab);
-        }}
         onOpenAbout={() => setIsAboutOpen(true)}
         isBackendConnected={isBackendConnected}
-        activeCaseId={activeCaseId}
-        hasActiveCase={!!segmentationResult}
       />
-
       <main className="flex-1">
-        {/* Section 1: Home View */}
-        {activeTab === 'home' && (
-          <HomeView
-            onOpenWorkstation={handleOpenWorkstation}
-            onOpenCases={() => setActiveTab('cases')}
+        {currentView === 'upload' && (
+          <UploadWorkspace
+            onStartSegmentation={handleStartSegmentation}
             isBackendConnected={isBackendConnected}
-            hasActiveCase={!!segmentationResult}
-            activeCaseId={activeCaseId}
           />
         )}
-
-        {/* Section 2: Cases View (Upload & Processing) */}
-        {activeTab === 'cases' && (
-          isProcessing ? (
-            <ProcessingView
-              stage={processingStage}
-              stageDescription={stageDescription}
-              progressPercent={null}
-              error={processingError}
-              onRetry={handleRetryProcessing}
-              onCancel={() => {
-                requestSequence.current += 1;
-                setIsProcessing(false);
-              }}
-            />
-          ) : (
-            <UploadWorkspace
-              onStartSegmentation={handleStartSegmentation}
-              isBackendConnected={isBackendConnected}
-              hasActiveCase={!!segmentationResult}
-              activeCaseId={activeCaseId}
-              onOpenWorkstation={() => setActiveTab('workstation')}
-              onResetCase={() => void handleStartNewCase()}
-            />
-          )
+        {currentView === 'processing' && (
+          <ProcessingView
+            stage={processingStage}
+            stageDescription={stageDescription}
+            progressPercent={null}
+            error={processingError}
+            onRetry={handleRetryProcessing}
+            onCancel={() => {
+              requestSequence.current += 1;
+              setCurrentView('upload');
+            }}
+          />
         )}
-
-        {/* Section 3: Workstation View */}
-        {activeTab === 'workstation' && (
+        {currentView === 'results' && segmentationResult && (
           <ResultsPage
             result={segmentationResult}
-            onStartNewCase={() => void handleStartNewCase()}
-            onOpenCases={() => setActiveTab('cases')}
-          />
-        )}
-
-        {/* Section 4: Reports View */}
-        {activeTab === 'reports' && (
-          <ReportsView
-            result={segmentationResult}
-            onOpenCases={() => setActiveTab('cases')}
             onStartNewCase={() => void handleStartNewCase()}
           />
         )}
       </main>
-
-      {/* About Modal Dialog */}
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
     </div>
   );

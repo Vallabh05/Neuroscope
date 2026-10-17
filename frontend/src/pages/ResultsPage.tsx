@@ -6,49 +6,16 @@ import { MeasurementsPanel } from '../components/measurements/MeasurementsPanel'
 import { VerificationPanel } from '../components/verification/VerificationPanel';
 import { ExportActions } from '../components/export/ExportActions';
 import { voxelToWorld } from '../utils/coordinates';
-import { ArrowRight, Box, Layers, Maximize2 } from 'lucide-react';
 
 interface ResultsPageProps {
-  result: SegmentationResult | null;
+  result: SegmentationResult;
   onStartNewCase: () => void;
-  onOpenCases?: () => void;
 }
 
 export const ResultsPage: React.FC<ResultsPageProps> = ({
   result,
   onStartNewCase,
-  onOpenCases,
 }) => {
-  if (!result) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-16 sm:px-6">
-        <div className="border border-atern-border bg-atern-surface p-8 text-center space-y-4 rounded-sm font-mono">
-          <div className="w-10 h-10 mx-auto rounded-none bg-atern-bg border border-atern-border flex items-center justify-center text-atern-muted">
-            <Layers className="w-5 h-5 text-atern-blue" />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-base font-bold uppercase tracking-wider text-atern-text">
-              No Study Active in Workstation
-            </h2>
-            <p className="text-xs text-atern-muted max-w-md mx-auto leading-relaxed">
-              The medical imaging workstation requires a segmented 4-modality brain MRI series. Select or upload sequences in the Cases tab to begin analysis.
-            </p>
-          </div>
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={onOpenCases}
-              className="px-5 py-2.5 bg-atern-blue hover:bg-atern-blue-hover text-white text-xs font-semibold uppercase tracking-wider rounded-sm inline-flex items-center space-x-2 transition-colors cursor-pointer"
-            >
-              <span>Open Cases & Ingest Sequences</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Synchronized Coordinate state across 3D view and all 3 orthogonal slice views
   const [coords, setCoords] = useState<CoordinatesState>(() => {
     const initVoxel: [number, number, number] = result.dimensions.map(
@@ -56,14 +23,15 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
     ) as [number, number, number];
     return {
       voxel: initVoxel,
-      world: voxelToWorld(initVoxel, result.affine),
+      world: voxelToWorld(initVoxel, result.affine)
     };
   });
 
   // Region controls (WT, TC, ET)
   const [regions, setRegions] = useState(result.volumes);
 
-  // Active view layout mode: 'both' | '3d' | 'slices'
+  // Active view layout tab for desktop / mobile:
+  // 'both' (split view: 3D + 2D Slices), '3d' (only 3D), 'slices' (only 2D slices)
   const [viewMode, setViewMode] = useState<'both' | '3d' | 'slices'>('both');
 
   const handleToggleRegion = (id: 'wt' | 'tc' | 'et') => {
@@ -71,8 +39,8 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
       ...prev,
       [id]: {
         ...prev[id],
-        visible: !prev[id].visible,
-      },
+        visible: !prev[id].visible
+      }
     }));
   };
 
@@ -81,72 +49,57 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
       ...prev,
       [id]: {
         ...prev[id],
-        opacity,
-      },
+        opacity
+      }
     }));
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 space-y-5 animate-fade-in font-mono">
-      {/* Top Workstation Control Bar: Viewport Switcher & Synchronized Coordinates */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-1 gap-3">
-        <div className="flex items-center space-x-2 text-xs">
-          <span className="font-bold uppercase tracking-wider text-atern-muted text-[11px]">
-            Viewport:
-          </span>
-          <div className="flex items-center space-x-1 bg-atern-surface p-0.5 rounded-sm border border-atern-border">
+    <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 space-y-6 animate-fade-in">
+      {/* Main View Mode Selector */}
+      <div className="flex items-center justify-between pb-1">
+        <div className="flex items-center space-x-2 text-xs text-slate-300">
+          <span className="font-semibold text-white">Visualisation Mode:</span>
+          <div className="flex items-center space-x-1 bg-neuro-900 p-1 rounded-xl border border-neuro-800">
             <button
-              type="button"
               onClick={() => setViewMode('both')}
-              className={`px-3 py-1 rounded-sm text-xs uppercase font-bold tracking-wider transition-colors cursor-pointer ${
-                viewMode === 'both'
-                  ? 'bg-atern-blue text-white'
-                  : 'text-atern-muted hover:text-atern-text hover:bg-atern-hover'
+              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+                viewMode === 'both' ? 'bg-cyan-600 text-white font-semibold shadow-sm' : 'text-slate-400 hover:text-white'
               }`}
             >
-              Split (3D + 2D)
+              Interactive Split (3D + 2D Slices)
             </button>
             <button
-              type="button"
               onClick={() => setViewMode('3d')}
-              className={`px-3 py-1 rounded-sm text-xs uppercase font-bold tracking-wider transition-colors cursor-pointer ${
-                viewMode === '3d'
-                  ? 'bg-atern-blue text-white'
-                  : 'text-atern-muted hover:text-atern-text hover:bg-atern-hover'
+              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+                viewMode === '3d' ? 'bg-cyan-600 text-white font-semibold shadow-sm' : 'text-slate-400 hover:text-white'
               }`}
             >
-              3D Surface
+              3D Surface Only
             </button>
             <button
-              type="button"
               onClick={() => setViewMode('slices')}
-              className={`px-3 py-1 rounded-sm text-xs uppercase font-bold tracking-wider transition-colors cursor-pointer ${
-                viewMode === 'slices'
-                  ? 'bg-atern-blue text-white'
-                  : 'text-atern-muted hover:text-atern-text hover:bg-atern-hover'
+              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+                viewMode === 'slices' ? 'bg-cyan-600 text-white font-semibold shadow-sm' : 'text-slate-400 hover:text-white'
               }`}
             >
-              2D Slices
+              Orthogonal Slices Only
             </button>
           </div>
         </div>
 
-        {/* Global Position Indicator */}
-        <div className="flex items-center space-x-3 text-xs bg-atern-surface px-3 py-1 rounded-sm border border-atern-border">
-          <span className="text-atern-muted uppercase">Coord:</span>
-          <span className="text-atern-text font-bold">
-            Voxel [{coords.voxel.join(', ')}]
-          </span>
-          <span className="text-atern-blue font-bold">
-            World [{coords.world.map(v => v.toFixed(1)).join(', ')}] mm
-          </span>
+        {/* Co-registered coordinate indicator */}
+        <div className="hidden md:flex items-center space-x-3 text-xs font-mono bg-neuro-900/80 px-3 py-1.5 rounded-xl border border-neuro-800">
+          <span className="text-slate-400">Position:</span>
+          <span className="text-cyan-300">Voxel [{coords.voxel.join(', ')}]</span>
+          <span className="text-cyan-300">World [{coords.world.map(value => value.toFixed(1)).join(', ')}] mm</span>
         </div>
       </div>
 
-      {/* Primary Visualisation Layout */}
-      <div>
+      {/* Primary Visualisation Region */}
+      <div className="space-y-6">
         {viewMode === 'both' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* 3D Brain Viewer: 5 cols */}
             <div className="lg:col-span-5 h-[540px]">
               <ThreeBrainViewer
@@ -158,7 +111,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
               />
             </div>
 
-            {/* Linked 2D Orthogonal Slices: 7 cols */}
+            {/* Linked 2D Slices: 7 cols */}
             <div className="lg:col-span-7">
               <OrthogonalSliceViewer
                 result={result}
@@ -169,7 +122,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
             </div>
           </div>
         ) : viewMode === '3d' ? (
-          <div className="h-[640px] w-full">
+          <div className="h-[650px] w-full">
             <ThreeBrainViewer
               result={result}
               activeWorldPos={coords.world}
