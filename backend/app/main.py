@@ -613,6 +613,7 @@ def create_app(
         application.add_middleware(
             CORSMiddleware,
             allow_origins=list(configured.cors_origins),
+            allow_origin_regex=r"https://.*\.vercel\.app",
             allow_credentials=False,
             allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
             allow_headers=["Content-Type"],
