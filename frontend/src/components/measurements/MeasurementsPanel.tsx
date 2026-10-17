@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import type { CoordinatesState, RegionVolume, SegmentationResult } from '../../types';
 import { voxelToWorld } from '../../utils/coordinates';
+import { calculateTumorAnalytics } from '../../utils/tumorAnalytics';
+import { generatePdfReport, generateCsvReport } from '../../utils/reportGenerators';
 import {
   Activity,
   BarChart3,
@@ -13,6 +15,8 @@ import {
   Download,
   Eye,
   EyeOff,
+  FileSpreadsheet,
+  FileText,
   Flame,
   Info,
   Layers,
@@ -51,213 +55,8 @@ export const MeasurementsPanel: React.FC<MeasurementsPanelProps> = ({
 
   const [dimX, dimY, dimZ] = result.dimensions;
 
-  // Single-pass high-performance analytics calculation over typed mask array
-  const analytics = useMemo(() => {
-    const maskData = result.mask.data as Uint8Array;
-    const affine = result.affine;
-    const voxelSpacing = result.voxel_spacing_mm;
-
-    // Affine determinant for voxel volume in mm³
-    const a = affine;
-    const voxelVolumeMm3 = Math.abs(
-      a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) -
-      a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) +
-      a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]),
-    );
-
-    let count0 = 0;
-    let count1 = 0; // NCR/NET (Label 1)
-    let count2 = 0; // ED (Label 2)
-    let count4 = 0; // ET (Label 4)
-
-    let sumX_wt = 0, sumY_wt = 0, sumZ_wt = 0, count_wt = 0;
-    let sumX_tc = 0, sumY_tc = 0, sumZ_tc = 0, count_tc = 0;
-    let sumX_et = 0, sumY_et = 0, sumZ_et = 0;
-    let sumX_ncr = 0, sumY_ncr = 0, sumZ_ncr = 0;
-    let sumX_ed = 0, sumY_ed = 0, sumZ_ed = 0;
-
-    let minX = dimX, maxX = -1;
-    let minY = dimY, maxY = -1;
-    let minZ = dimZ, maxZ = -1;
-
-    const axialProfile = new Uint32Array(dimZ);
-    const coronalProfile = new Uint32Array(dimY);
-    const sagittalProfile = new Uint32Array(dimX);
-
-    for (let z = 0; z < dimZ; z++) {
-      for (let y = 0; y < dimY; y++) {
-        const rowOffset = (y + dimY * z) * dimX;
-        for (let x = 0; x < dimX; x++) {
-          const label = maskData[rowOffset + x];
-          if (label === 0) {
-            count0++;
-            continue;
-          }
-
-          count_wt++;
-          sumX_wt += x;
-          sumY_wt += y;
-          sumZ_wt += z;
-
-          axialProfile[z]++;
-          coronalProfile[y]++;
-          sagittalProfile[x]++;
-
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-          if (z < minZ) minZ = z;
-          if (z > maxZ) maxZ = z;
-
-          if (label === 1) {
-            count1++;
-            sumX_ncr += x;
-            sumY_ncr += y;
-            sumZ_ncr += z;
-            count_tc++;
-            sumX_tc += x;
-            sumY_tc += y;
-            sumZ_tc += z;
-          } else if (label === 2) {
-            count2++;
-            sumX_ed += x;
-            sumY_ed += y;
-            sumZ_ed += z;
-          } else if (label === 4) {
-            count4++;
-            sumX_et += x;
-            sumY_et += y;
-            sumZ_et += z;
-            count_tc++;
-            sumX_tc += x;
-            sumY_tc += y;
-            sumZ_tc += z;
-          }
-        }
-      }
-    }
-
-    const calcCentroid = (
-      sumX: number,
-      sumY: number,
-      sumZ: number,
-      count: number,
-    ): { voxel: [number, number, number]; world: [number, number, number] } => {
-      if (count === 0) {
-        const mid: [number, number, number] = [
-          Math.floor(dimX / 2),
-          Math.floor(dimY / 2),
-          Math.floor(dimZ / 2),
-        ];
-        return { voxel: mid, world: voxelToWorld(mid, affine) };
-      }
-      const v: [number, number, number] = [
-        Math.round(sumX / count),
-        Math.round(sumY / count),
-        Math.round(sumZ / count),
-      ];
-      return { voxel: v, world: voxelToWorld(v, affine) };
-    };
-
-    const centroidWT = calcCentroid(sumX_wt, sumY_wt, sumZ_wt, count_wt);
-    const centroidTC = calcCentroid(sumX_tc, sumY_tc, sumZ_tc, count_tc);
-    const centroidET = calcCentroid(sumX_et, sumY_et, sumZ_et, count4);
-    const centroidNCR = calcCentroid(sumX_ncr, sumY_ncr, sumZ_ncr, count1);
-    const centroidED = calcCentroid(sumX_ed, sumY_ed, sumZ_ed, count2);
-
-    const hasTumor = count_wt > 0;
-    const bbox = hasTumor
-      ? {
-          min: [minX, minY, minZ] as [number, number, number],
-          max: [maxX, maxY, maxZ] as [number, number, number],
-          sizeVoxels: [maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1] as [number, number, number],
-          sizeMm: [
-            (maxX - minX + 1) * voxelSpacing[0],
-            (maxY - minY + 1) * voxelSpacing[1],
-            (maxZ - minZ + 1) * voxelSpacing[2],
-          ] as [number, number, number],
-        }
-      : null;
-
-    const maxDiameter3dMm = bbox ? Math.hypot(...bbox.sizeMm) : 0;
-    const maxAxialDiameterMm = bbox ? Math.hypot(bbox.sizeMm[0], bbox.sizeMm[1]) : 0;
-
-    // Find peak slice for each anatomical plane
-    let peakAxial = 0;
-    let maxAxialCount = 0;
-    for (let z = 0; z < dimZ; z++) {
-      if (axialProfile[z] > maxAxialCount) {
-        maxAxialCount = axialProfile[z];
-        peakAxial = z;
-      }
-    }
-
-    let peakCoronal = 0;
-    let maxCoronalCount = 0;
-    for (let y = 0; y < dimY; y++) {
-      if (coronalProfile[y] > maxCoronalCount) {
-        maxCoronalCount = coronalProfile[y];
-        peakCoronal = y;
-      }
-    }
-
-    let peakSagittal = 0;
-    let maxSagittalCount = 0;
-    for (let x = 0; x < dimX; x++) {
-      if (sagittalProfile[x] > maxSagittalCount) {
-        maxSagittalCount = sagittalProfile[x];
-        peakSagittal = x;
-      }
-    }
-
-    return {
-      voxelVolumeMm3,
-      voxelVolumeMl: voxelVolumeMm3 / 1000,
-      counts: {
-        background: count0,
-        ncr: count1,
-        edema: count2,
-        et: count4,
-        tc: count_tc,
-        wt: count_wt,
-      },
-      volumes: {
-        wt: { ml: (count_wt * voxelVolumeMm3) / 1000, mm3: count_wt * voxelVolumeMm3, count: count_wt },
-        tc: { ml: (count_tc * voxelVolumeMm3) / 1000, mm3: count_tc * voxelVolumeMm3, count: count_tc },
-        et: { ml: (count4 * voxelVolumeMm3) / 1000, mm3: count4 * voxelVolumeMm3, count: count4 },
-        ncr: { ml: (count1 * voxelVolumeMm3) / 1000, mm3: count1 * voxelVolumeMm3, count: count1 },
-        edema: { ml: (count2 * voxelVolumeMm3) / 1000, mm3: count2 * voxelVolumeMm3, count: count2 },
-      },
-      ratios: {
-        enhancingFraction: count_tc > 0 ? (count4 / count_tc) * 100 : 0,
-        coreToWholeRatio: count_wt > 0 ? (count_tc / count_wt) * 100 : 0,
-        edemaToCoreRatio: count_tc > 0 ? count2 / count_tc : 0,
-        necroticFraction: count_tc > 0 ? (count1 / count_tc) * 100 : 0,
-        edemaFraction: count_wt > 0 ? (count2 / count_wt) * 100 : 0,
-      },
-      centroids: {
-        wt: centroidWT,
-        tc: centroidTC,
-        et: centroidET,
-        ncr: centroidNCR,
-        ed: centroidED,
-      },
-      bbox,
-      maxDiameter3dMm,
-      maxAxialDiameterMm,
-      profiles: {
-        axial: axialProfile,
-        coronal: coronalProfile,
-        sagittal: sagittalProfile,
-        peaks: {
-          axial: { slice: peakAxial, count: maxAxialCount },
-          coronal: { slice: peakCoronal, count: maxCoronalCount },
-          sagittal: { slice: peakSagittal, count: maxSagittalCount },
-        },
-      },
-    };
-  }, [result.mask, result.dimensions, result.affine, result.voxel_spacing_mm, dimX, dimY, dimZ]);
+  // Shared high-performance analytics calculation over typed mask array
+  const analytics = useMemo(() => calculateTumorAnalytics(result), [result]);
 
   const jumpTo = (voxel: [number, number, number]) => {
     if (!onCoordsChange) return;
@@ -496,6 +295,28 @@ export const MeasurementsPanel: React.FC<MeasurementsPanelProps> = ({
             </button>
           </div>
 
+          {/* Download PDF */}
+          <button
+            type="button"
+            onClick={() => generatePdfReport(result)}
+            className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-cyan-600/20 transition-all hover:scale-[1.02]"
+            title="Download formatted clinical and volumetric analysis report as PDF"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>PDF</span>
+          </button>
+
+          {/* Export CSV */}
+          <button
+            type="button"
+            onClick={() => generateCsvReport(result)}
+            className="px-3 py-1.5 rounded-xl bg-neuro-850 hover:bg-neuro-800 border border-emerald-600/40 text-emerald-300 text-xs font-medium flex items-center gap-1.5 transition-colors"
+            title="Download structured spreadsheet report with all volumetric metrics"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>CSV</span>
+          </button>
+
           {/* Copy Report */}
           <button
             type="button"
@@ -505,17 +326,6 @@ export const MeasurementsPanel: React.FC<MeasurementsPanelProps> = ({
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
-          </button>
-
-          {/* Export CSV */}
-          <button
-            type="button"
-            onClick={handleDownloadCsv}
-            className="px-3 py-1.5 rounded-xl bg-neuro-850 hover:bg-neuro-800 border border-neuro-750 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors"
-            title="Download CSV table of volumetric measurements"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>CSV</span>
           </button>
         </div>
       </div>
