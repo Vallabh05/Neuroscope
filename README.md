@@ -1,20 +1,27 @@
 # NeuroScope 3D
 
 NeuroScope 3D is a research and educational prototype for 3D brain MRI
-segmentation. The current repository contains a Python/FastAPI backend and
-MRI modality validation utilities. A user-facing frontend and the MRI
-prediction API workflow have not been added yet.
+segmentation. The repository contains a Python/FastAPI backend with MRI
+validation, TorchScript inference, segmentation validation, NIfTI export,
+measurements, integrity-passport utilities, and a local MRI segmentation API
+workflow. The API accepts an optional BraTS expert mask for per-case region
+metrics, and the backend includes a standalone prediction command. A
+user-facing 3D viewer has not been added yet.
 
 **Research prototype only: this project is not a medical device and must not
 be used for clinical diagnosis, treatment decisions, or emergency care.**
 MRI validation and synthetic/model smoke tests do not establish diagnostic
-accuracy on real patient scans.
+accuracy on real patient scans. The bundled model is explicitly an example
+not intended for diagnosis; the API is a research prototype, not a clinical
+decision-support tool.
+The repository does not include a 3D browser viewer or a held-out labelled
+evaluation cohort, so it does not claim the challenge's 10-patient metrics.
 
 ## Repository structure
 
 ```text
 backend/
-  app/                       FastAPI application and MRI validation service
+  app/                       API entry point and MRI pipeline services
   tests/                     Backend and validation tests
   models/
     brats_mri_segmentation/   Model configuration, documentation, and licenses
@@ -55,9 +62,13 @@ Start the development API from `backend/`:
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The API root is `http://127.0.0.1:8000/`, health check is
-`http://127.0.0.1:8000/health`, and interactive documentation is
-`http://127.0.0.1:8000/docs`.
+The API health check is `http://127.0.0.1:8000/health`, readiness check is
+`http://127.0.0.1:8000/health/ready`, and interactive documentation is
+`http://127.0.0.1:8000/docs`. Use Swagger to upload `T1ce`, `T1`, `T2`, and
+`FLAIR`, then segment the returned case ID. See
+[backend/README.md](backend/README.md) for endpoints, configuration, upload
+limits, and storage behavior. This API has no authentication and is for
+localhost development only.
 
 ## Tests
 
@@ -66,11 +77,19 @@ Install pytest into the active environment, then run tests from `backend/`:
 ```powershell
 python -m pip install pytest
 python -m pytest
-python -m unittest discover -s tests
 ```
 
 The MRI validation tests create temporary synthetic NIfTI files. They do not
-download or require real patient scans.
+download or require real patient scans. The API uses the separately obtained
+TorchScript model for segmentation.
+
+The backend also includes segmentation-grid validation, safe NIfTI export,
+per-label volume measurements, and JSON integrity-passport utilities wired
+into the local segmentation API workflow.
+The API also removes stored cases automatically within 24 hours. An optional
+expert mask can provide per-case Dice, sensitivity, and reference volumes;
+this is not a substitute for patient-level held-out evaluation. See the
+backend README for the prediction CLI and API details.
 
 ## Model and MRI data
 

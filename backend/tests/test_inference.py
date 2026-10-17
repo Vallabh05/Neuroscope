@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import nibabel as nib
 import numpy as np
 import pytest
 import torch
@@ -35,17 +36,24 @@ class DirectInferer:
 @pytest.fixture
 def validated_modalities():
     shape = (8, 8, 8)
-    affine = np.diag([1.5, 1.5, 2.0, 1.0])
+    affine = np.diag([1.0, 1.0, 1.0, 1.0])
+    arrays = {
+        "T1ce": np.arange(1, 513, dtype=np.float32).reshape(shape),
+        "T1": np.arange(2, 514, dtype=np.float32).reshape(shape),
+        "T2": np.arange(3, 515, dtype=np.float32).reshape(shape),
+        "FLAIR": np.arange(4, 516, dtype=np.float32).reshape(shape),
+    }
+    images = {}
+    for name, data in arrays.items():
+        image = nib.Nifti1Image(data, affine)
+        image.header.set_xyzt_units("mm")
+        images[name] = image
     return {
-        "arrays": {
-            "T1ce": np.arange(1, 513, dtype=np.float32).reshape(shape),
-            "T1": np.arange(2, 514, dtype=np.float32).reshape(shape),
-            "T2": np.arange(3, 515, dtype=np.float32).reshape(shape),
-            "FLAIR": np.arange(4, 516, dtype=np.float32).reshape(shape),
-        },
+        "arrays": arrays,
+        "images": images,
         "shape": shape,
         "affine": affine,
-        "spacing_mm": np.array([1.5, 1.5, 2.0]),
+        "spacing_mm": np.array([1.0, 1.0, 1.0]),
         "channel_order": ("T1ce", "T1", "T2", "FLAIR"),
     }
 
@@ -94,16 +102,21 @@ def test_inference_uses_bundle_settings_and_preserves_reference_geometry(
     assert model.last_input.shape == (1, 4, 8, 8, 8)
     assert result.segmentation.shape == validated_modalities["shape"]
     assert result.segmentation.dtype == np.uint8
+    assert result.output_shape == validated_modalities["shape"]
+    assert result.validation_warnings == ()
     assert result.segmentation[0, 0, 0] == 1
     assert result.segmentation[0, 0, 1] == 2
     assert result.segmentation[0, 0, 2] == 1
     assert result.segmentation[0, 0, 3] == 4
     assert set(np.unique(result.segmentation)).issubset({0, 1, 2, 4})
     np.testing.assert_array_equal(result.affine, validated_modalities["affine"])
-    assert result.spacing_mm == (1.5, 1.5, 2.0)
+    assert result.spacing_mm == (1.0, 1.0, 1.0)
     assert result.device == "cpu"
     assert result.model_identifier == "BraTS MRI segmentation 0.5.1"
     assert result.inference_seconds >= 0
+    assert len(result.model_sha256) == 64
+    assert result.runtime_provenance["device_name"] == "CPU"
+    assert result.inference_configuration["threshold"] == 0.5
 
 
 def test_service_loads_model_once_and_normalizes_in_documented_channel_order(
@@ -157,6 +170,63 @@ def test_invalid_validated_modality_order_is_rejected(validated_modalities):
     validated_modalities["channel_order"] = ("T1", "T1ce", "T2", "FLAIR")
 
     with pytest.raises(InferenceError, match="modality order"):
+        service.infer(validated_modalities)
+
+
+def test_anisotropic_spacing_is_resampled_and_output_is_restored(
+    validated_modalities,
+):
+    class AllPositiveModel(torch.nn.Module):
+        def forward(self, inputs):
+            return torch.zeros((1, 3, *inputs.shape[-3:]), device=inputs.device)
+
+    with (
+        patch("app.services.inference.torch.cuda.is_available", return_value=False),
+        patch("app.services.inference.torch.jit.load", return_value=AllPositiveModel()),
+        patch(
+            "app.services.inference.SlidingWindowInferer",
+            side_effect=lambda **kwargs: DirectInferer(**kwargs),
+        ),
+    ):
+        service = InferenceService()
+    validated_modalities["affine"] = np.diag([1.0, 1.0, 2.0, 1.0])
+    validated_modalities["spacing_mm"] = np.array([1.0, 1.0, 2.0])
+    for modality, data in validated_modalities["arrays"].items():
+        image = nib.Nifti1Image(data, validated_modalities["affine"])
+        image.header.set_xyzt_units("mm")
+        validated_modalities["images"][modality] = image
+
+    result = service.infer(validated_modalities)
+
+    assert result.segmentation.shape == validated_modalities["shape"]
+    assert np.all(result.segmentation == 4)
+    assert result.spacing_mm == (1.0, 1.0, 2.0)
+    assert (
+        result.inference_configuration["spatial_preprocessing"]["model_spacing_mm"]
+        == [1.0, 1.0, 1.0]
+    )
+
+
+def test_left_right_reorientation_is_canonicalized(validated_modalities):
+    shape = validated_modalities["shape"]
+    affine = np.diag([-1.0, 1.0, 1.0, 1.0])
+    affine[0, 3] = shape[0] - 1
+    data = np.zeros(shape, dtype=np.float32)
+    data[1, 2, 3] = 10
+    image = nib.Nifti1Image(data, affine)
+    image.header.set_xyzt_units("mm")
+    validated_modalities["images"]["T1ce"] = image
+
+    _, canonical = InferenceService._prepare_model_input(validated_modalities)
+
+    assert canonical[0, shape[0] - 2, 2, 3] == 10
+
+
+def test_affine_mismatch_between_declared_spacing_is_rejected(validated_modalities):
+    service, _, _, _ = create_service(make_logits())
+    validated_modalities["affine"] = np.diag([1.5, 1.0, 1.0, 1.0])
+
+    with pytest.raises(InferenceError, match="does not match its reference affine"):
         service.infer(validated_modalities)
 
 

@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import platform
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
 
+import monai
+import nibabel as nib
 import numpy as np
 import torch
 from monai.inferers import SlidingWindowInferer
 from monai.transforms import NormalizeIntensity
+from nibabel.processing import resample_from_to, resample_to_output
+
+from app.services.validation import MODEL_SPACING_MM
 
 
 REQUIRED_MODALITIES = ("T1ce", "T1", "T2", "FLAIR")
@@ -25,20 +32,27 @@ MODEL_FILENAME = "model.ts"
 
 class ValidatedModalities(TypedDict):
     arrays: Mapping[str, np.ndarray]
+    images: Mapping[str, nib.spatialimages.SpatialImage]
     shape: tuple[int, int, int]
     affine: np.ndarray
     spacing_mm: np.ndarray
     channel_order: tuple[str, ...]
+    warnings: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class InferenceResult:
     segmentation: np.ndarray
+    output_shape: tuple[int, int, int]
     affine: np.ndarray
     spacing_mm: tuple[float, float, float]
     device: str
     model_identifier: str
     inference_seconds: float
+    model_sha256: str
+    runtime_provenance: dict[str, str | None]
+    validation_warnings: tuple[str, ...]
+    inference_configuration: dict[str, object]
 
 
 @dataclass(frozen=True)
@@ -244,6 +258,12 @@ class InferenceService:
             )
 
         try:
+            self.model_sha256 = _sha256_model(self.model_path)
+        except OSError as exc:
+            raise InferenceError(
+                "Could not calculate the TorchScript model integrity hash."
+            ) from exc
+        try:
             self.model = torch.jit.load(
                 str(self.model_path),
                 map_location=self.device,
@@ -264,14 +284,29 @@ class InferenceService:
             nonzero=self.settings.normalize_nonzero,
             channel_wise=self.settings.normalize_channel_wise,
         )
+        self.runtime_provenance = {
+            "python_version": platform.python_version(),
+            "numpy_version": np.__version__,
+            "torch_version": str(torch.__version__),
+            "monai_version": monai.__version__,
+            "cuda_runtime_version": torch.version.cuda,
+            "cudnn_version": (
+                str(torch.backends.cudnn.version())
+                if torch.backends.cudnn.version() is not None
+                else None
+            ),
+            "device_name": (
+                torch.cuda.get_device_name(self.device)
+                if self.device.type == "cuda"
+                else "CPU"
+            ),
+        }
 
     def infer(self, validated: ValidatedModalities) -> InferenceResult:
         shape = self._validate_input(validated)
-        arrays = validated["arrays"]
-        image = np.stack(
-            [arrays[modality] for modality in REQUIRED_MODALITIES],
-            axis=0,
-        )
+        started_at = time.perf_counter()
+        model_reference, image = self._prepare_model_input(validated)
+        model_shape = tuple(int(size) for size in model_reference.shape)
         inputs = torch.from_numpy(np.ascontiguousarray(image)).to(
             dtype=torch.float32
         )
@@ -282,7 +317,6 @@ class InferenceService:
             )
         inputs = inputs.to(self.device)
 
-        started_at = time.perf_counter()
         try:
             with (
                 torch.inference_mode(),
@@ -296,7 +330,7 @@ class InferenceService:
                     raise InferenceError(
                         "The model returned an unsupported output type."
                     )
-                expected_shape = (1, 3, *shape)
+                expected_shape = (1, 3, *model_shape)
                 if tuple(prediction.shape) != expected_shape:
                     raise InferenceError(
                         "The model output shape does not match the expected "
@@ -310,7 +344,7 @@ class InferenceService:
                 activated = torch.sigmoid(prediction)
                 binary = activated >= self.settings.threshold
                 segmentation = torch.zeros(
-                    shape,
+                    model_shape,
                     dtype=torch.uint8,
                     device=prediction.device,
                 )
@@ -318,6 +352,22 @@ class InferenceService:
                 segmentation[binary[0, 0]] = 1
                 segmentation[binary[0, 2]] = 4
                 segmentation_array = segmentation.cpu().numpy()
+
+                model_segmentation = nib.Nifti1Image(
+                    segmentation_array,
+                    model_reference.affine,
+                )
+                restored = resample_from_to(
+                    model_segmentation,
+                    (shape, np.asarray(validated["affine"], dtype=np.float64)),
+                    order=0,
+                    mode="constant",
+                    cval=0,
+                )
+                segmentation_array = np.asarray(
+                    restored.dataobj,
+                    dtype=np.uint8,
+                )
         except InferenceError:
             raise
         except Exception as exc:
@@ -327,15 +377,53 @@ class InferenceService:
             ) from exc
         inference_seconds = time.perf_counter() - started_at
 
+        if segmentation_array.shape != shape:
+            raise InferenceError(
+                "The generated segmentation shape does not match the input MRI "
+                f"grid: expected {shape}, received {segmentation_array.shape}."
+            )
+        if not np.issubdtype(segmentation_array.dtype, np.integer):
+            raise InferenceError("The generated segmentation is not integer-valued.")
+        if not np.isin(segmentation_array, (0, 1, 2, 4)).all():
+            raise InferenceError(
+                "The generated segmentation contains an unsupported label."
+            )
+
         affine = np.asarray(validated["affine"], dtype=np.float64).copy()
         spacing = tuple(float(value) for value in validated["spacing_mm"])
         return InferenceResult(
             segmentation=segmentation_array,
+            output_shape=tuple(int(value) for value in segmentation_array.shape),
             affine=affine,
             spacing_mm=spacing,
             device=str(self.device),
             model_identifier=self.settings.model_identifier,
             inference_seconds=inference_seconds,
+            model_sha256=self.model_sha256,
+            runtime_provenance=self.runtime_provenance.copy(),
+            validation_warnings=(),
+            inference_configuration={
+                "normalization": {
+                    "nonzero": self.settings.normalize_nonzero,
+                    "channel_wise": self.settings.normalize_channel_wise,
+                },
+                "sliding_window": {
+                    "roi_size": list(self.settings.roi_size),
+                    "sw_batch_size": self.settings.sw_batch_size,
+                    "overlap": self.settings.overlap,
+                },
+                "activation": "sigmoid",
+                "threshold": self.settings.threshold,
+                "spatial_preprocessing": {
+                    "orientation": "closest_canonical_RAS",
+                    "model_spacing_mm": list(MODEL_SPACING_MM),
+                    "intensity_interpolation": "trilinear",
+                    "inverse_segmentation_interpolation": "nearest_neighbor",
+                    "output_grid": "original_input_reference",
+                },
+                "output_channel_order": list(EXPECTED_OUTPUT_LABELS),
+                "label_precedence": {"enhancing_tumor": 4, "tumor_core": 1, "whole_tumor": 2},
+            },
         )
 
     @staticmethod
@@ -390,5 +478,58 @@ class InferenceService:
             or np.any(spacing <= 0)
         ):
             raise InferenceError("Validated MRI voxel spacing is invalid.")
+        affine_spacing = np.linalg.norm(affine[:3, :3], axis=0)
+        if not np.allclose(affine_spacing, spacing, atol=1e-3, rtol=0):
+            raise InferenceError(
+                "MRI voxel spacing does not match its reference affine."
+            )
 
         return shape
+
+    @staticmethod
+    def _prepare_model_input(
+        validated: ValidatedModalities,
+    ) -> tuple[nib.spatialimages.SpatialImage, np.ndarray]:
+        images = validated.get("images")
+        if not isinstance(images, Mapping) or any(
+            modality not in images for modality in REQUIRED_MODALITIES
+        ):
+            raise InferenceError(
+                "Validated MRI NIfTI images are required for spatial preprocessing."
+            )
+
+        try:
+            canonical_reference = nib.as_closest_canonical(images["T1ce"])
+            model_reference = resample_to_output(
+                canonical_reference,
+                voxel_sizes=MODEL_SPACING_MM,
+                order=1,
+            )
+            target = (model_reference.shape, model_reference.affine)
+            channels = []
+            for modality in REQUIRED_MODALITIES:
+                canonical_image = nib.as_closest_canonical(images[modality])
+                resampled = resample_from_to(
+                    canonical_image,
+                    target,
+                    order=1,
+                    mode="constant",
+                    cval=0,
+                )
+                channels.append(resampled.get_fdata(dtype=np.float32))
+            image = np.stack(channels, axis=0)
+        except Exception as exc:
+            raise InferenceError(
+                "Could not orient and resample MRI modalities to the model's "
+                "1 mm canonical grid."
+            ) from exc
+
+        return model_reference, image
+
+
+def _sha256_model(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
