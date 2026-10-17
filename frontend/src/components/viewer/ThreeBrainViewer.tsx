@@ -3,8 +3,14 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import type { RegionVolume, SegmentationResult } from '../../types';
-import { createLabelSurfaces, volumeCenterWorld, volumeWorldExtent } from '../../utils/surface';
-import { Crosshair, Eye, EyeOff, Layers, RotateCcw } from 'lucide-react';
+import {
+  createBrainSurface,
+  createLabelSurfaces,
+  computeTumorAnatomy,
+  volumeCenterWorld,
+  volumeWorldExtent,
+} from '../../utils/surface';
+import { Brain, Crosshair, Eye, EyeOff, Grid3X3, Layers, MapPin, RotateCcw } from 'lucide-react';
 
 interface ThreeBrainViewerProps {
   result: SegmentationResult;
@@ -51,31 +57,75 @@ export const ThreeBrainViewer: React.FC<ThreeBrainViewerProps> = ({
   onChangeOpacity,
 }) => {
   const [showCrosshair, setShowCrosshair] = useState(true);
+  const [showBrain, setShowBrain] = useState(true);
+  const [brainOpacity, setBrainOpacity] = useState(0.18);
+  const [showWireframe, setShowWireframe] = useState(false);
   const [resetCameraCount, setResetCameraCount] = useState(0);
+
   const center = useMemo(() => volumeCenterWorld(result.mask), [result.mask]);
   const extent = useMemo(() => volumeWorldExtent(result.mask), [result.mask]);
   const distance = Math.max(100, extent * 1.8);
+
   const geometries = useMemo(() => createLabelSurfaces(result.mask), [result.mask]);
+
+  const brainGeometry = useMemo(() => {
+    const mri =
+      result.modalities?.t1gd ||
+      result.modalities?.t1 ||
+      result.modalities?.flair ||
+      result.modalities?.t2;
+    if (!mri) return null;
+    return createBrainSurface(mri, { step: 3, smoothIterations: 3 });
+  }, [result.modalities]);
+
+  const tumorAnatomy = useMemo(() => computeTumorAnatomy(result), [result]);
 
   React.useEffect(
     () => () => {
       geometries.wt.dispose();
       geometries.tc.dispose();
       geometries.et.dispose();
+      brainGeometry?.dispose();
     },
-    [geometries]
+    [geometries, brainGeometry]
   );
 
   return (
     <div className="relative w-full h-full min-h-[460px] bg-[#000000] rounded border border-[#222222] overflow-hidden flex flex-col select-none">
       {/* Top Overlays Toolbar: Minimalist Vercel Bar */}
-      <div className="absolute top-2.5 left-2.5 right-2.5 z-10 flex items-center justify-between pointer-events-none">
-        <div className="pointer-events-auto flex items-center space-x-2 bg-[#0A0A0A] px-2.5 py-1 rounded border border-[#222222] text-xs font-mono text-neutral-300">
-          <Layers className="w-3.5 h-3.5 text-neutral-400" />
-          <span className="font-semibold text-white">3D Surface View</span>
-          <span className="text-[10px] text-neutral-500">| World mm</span>
+      <div className="absolute top-2.5 left-2.5 right-2.5 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <div className="flex items-center space-x-2">
+          <div className="pointer-events-auto flex items-center space-x-2 bg-[#0A0A0A] px-2.5 py-1 rounded border border-[#222222] text-xs font-mono text-neutral-300">
+            <Layers className="w-3.5 h-3.5 text-neutral-400" />
+            <span className="font-semibold text-white">3D Surface View</span>
+            <span className="text-[10px] text-neutral-500">| World mm</span>
+          </div>
+
+          {tumorAnatomy && (
+            <div className="pointer-events-auto hidden sm:flex items-center space-x-1.5 bg-[#0A0A0A] px-2.5 py-1 rounded border border-[#222222] text-xs font-mono text-neutral-300">
+              <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-neutral-500">Tumor:</span>
+              <span className="font-semibold text-white">{tumorAnatomy.summary}</span>
+              <span className="text-[10px] text-neutral-400 bg-[#171717] px-1 py-0.5 rounded border border-[#262626]">
+                {tumorAnatomy.depth}
+              </span>
+            </div>
+          )}
         </div>
+
         <div className="pointer-events-auto flex items-center space-x-1 bg-[#0A0A0A] p-0.5 rounded border border-[#222222]">
+          <button
+            type="button"
+            onClick={() => setShowWireframe(value => !value)}
+            className={`p-1.5 rounded transition-colors cursor-pointer ${
+              showWireframe
+                ? 'bg-[#222222] text-white'
+                : 'text-neutral-500 hover:text-white'
+            }`}
+            title="Toggle brain cortex wireframe"
+          >
+            <Grid3X3 className="w-3.5 h-3.5" />
+          </button>
           <button
             type="button"
             onClick={() => setShowCrosshair(value => !value)}
@@ -111,13 +161,44 @@ export const ThreeBrainViewer: React.FC<ThreeBrainViewerProps> = ({
             far={distance * 10}
           />
           <CameraReset trigger={resetCameraCount} distance={distance} />
-          <ambientLight intensity={0.8} />
-          <directionalLight position={[extent, -extent, extent]} intensity={1.2} />
-          <directionalLight position={[-extent, extent, -extent / 2]} intensity={0.45} />
+          <ambientLight intensity={0.9} />
+          <directionalLight position={[extent, -extent, extent]} intensity={1.3} />
+          <directionalLight position={[-extent, extent, -extent / 2]} intensity={0.5} />
           <group position={[-center[0], -center[1], -center[2]]}>
+            {/* Anatomical Brain Cortex Shell */}
+            {brainGeometry && showBrain && (
+              <group>
+                <mesh geometry={brainGeometry}>
+                  <meshStandardMaterial
+                    color="#e2e8f0"
+                    transparent
+                    opacity={brainOpacity}
+                    side={THREE.DoubleSide}
+                    depthWrite={false}
+                    roughness={0.45}
+                    metalness={0.08}
+                  />
+                </mesh>
+                {showWireframe && (
+                  <mesh geometry={brainGeometry}>
+                    <meshBasicMaterial
+                      color="#cbd5e1"
+                      wireframe
+                      transparent
+                      opacity={Math.min(brainOpacity + 0.2, 0.45)}
+                      depthWrite={false}
+                    />
+                  </mesh>
+                )}
+              </group>
+            )}
+
+            {/* Segmented Tumor Volumes */}
             <RegionSurface geometry={geometries.wt} region={regions.wt} />
             <RegionSurface geometry={geometries.tc} region={regions.tc} />
             <RegionSurface geometry={geometries.et} region={regions.et} />
+
+            {/* Crosshair with coordinate axes */}
             {showCrosshair && (
               <group position={[activeWorldPos[0], activeWorldPos[1], activeWorldPos[2]]}>
                 <mesh>
@@ -134,7 +215,38 @@ export const ThreeBrainViewer: React.FC<ThreeBrainViewerProps> = ({
 
       {/* Bottom Region Visibility & Opacity Bar */}
       <div className="absolute bottom-2.5 left-2.5 right-2.5 z-10 pointer-events-none">
-        <div className="pointer-events-auto bg-[#0A0A0A] p-2.5 rounded border border-[#222222] max-w-xl mx-auto flex flex-wrap justify-between items-center gap-3 text-xs font-mono">
+        <div className="pointer-events-auto bg-[#0A0A0A] p-2.5 rounded border border-[#222222] max-w-2xl mx-auto flex flex-wrap justify-between items-center gap-3 text-xs font-mono">
+          {/* Brain Mesh Controls */}
+          <div className="flex items-center space-x-2 border-r border-[#222222] pr-3 mr-1">
+            <button
+              type="button"
+              onClick={() => setShowBrain(value => !value)}
+              className={`flex items-center space-x-1.5 px-2 py-1 rounded border transition-colors cursor-pointer ${
+                showBrain
+                  ? 'border-[#333333] bg-[#141414] text-white'
+                  : 'border-[#1C1C1C] bg-[#000000] text-neutral-500'
+              }`}
+              title="Toggle 3D anatomical brain cortex mesh"
+            >
+              <Brain className={`w-3.5 h-3.5 ${showBrain ? 'text-neutral-200' : 'text-neutral-600'}`} />
+              <span className="font-semibold text-xs">Brain</span>
+              {showBrain ? <Eye className="w-3 h-3 text-white" /> : <EyeOff className="w-3 h-3 text-neutral-600" />}
+            </button>
+            <input
+              type="range"
+              min="0.05"
+              max="0.6"
+              step="0.05"
+              value={brainOpacity}
+              disabled={!showBrain}
+              onChange={event => setBrainOpacity(Number(event.target.value))}
+              className="w-12 h-1 bg-[#1C1C1C] appearance-none cursor-pointer accent-white disabled:opacity-30"
+              title={`Brain surface opacity: ${Math.round(brainOpacity * 100)}%`}
+              aria-label="Brain surface opacity"
+            />
+          </div>
+
+          {/* Tumor Region Controls (WT, TC, ET) */}
           {(['wt', 'tc', 'et'] as const).map(id => (
             <div key={id} className="flex items-center space-x-2">
               <button
@@ -171,10 +283,11 @@ export const ThreeBrainViewer: React.FC<ThreeBrainViewerProps> = ({
       </div>
 
       <p className="absolute bottom-13 left-2.5 right-2.5 text-center text-[10px] font-mono text-neutral-500 pointer-events-none">
-        Predicted tumor surface meshes rendered with Marching Cubes; brain tissue contours omitted.
+        Interactive 3D tumor segmentation with anatomical brain cortex reference shell (World mm space).
       </p>
     </div>
   );
 };
 
 export default ThreeBrainViewer;
+
