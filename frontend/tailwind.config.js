@@ -8,36 +8,46 @@ export default {
   theme: {
     extend: {
       colors: {
-        neuro: {
-          950: '#070b14',
-          900: '#0c1222',
-          850: '#111a30',
-          800: '#162340',
-          700: '#1e3258',
-          600: '#284474',
-          500: '#3863a3',
-          400: '#5c8ad1',
-          300: '#8bb3f0',
-          200: '#c0d6f9',
-          100: '#e5effd',
+        // Aternos-inspired technical dark palette
+        atern: {
+          bg: '#0B0D10',           // Near-black main background
+          surface: '#151A21',      // Charcoal secondary surfaces/cards
+          hover: '#1C232D',        // Subtle elevation on hover
+          active: '#242D38',       // Active surface state
+          border: '#202833',       // Muted blue-grey borders & dividers
+          'border-focus': '#1677D2', // Focused border
+          blue: '#1677D2',         // Primary technical blue accent
+          'blue-hover': '#1E88E5', // Hover accent blue
+          'blue-dark': '#0D47A1',  // Deep blue tone
+          text: '#DCE4ED',         // Cool off-white primary text
+          muted: '#8593A3',        // Muted grey-blue secondary text
         },
-        // Standard BraTS 2021 segmentation colours
-        // WT: Whole Tumour (NCR + ED + ET) - Yellowish/Gold
-        // TC: Tumour Core (NCR + ET) - Crimson/Orange
-        // ET: Enhancing Tumour - Vibrant Cyan/Electric Blue
-        // ED: Peritumoral Edema - Emerald Green
-        // NCR: Necrotic / Non-enhancing core - Crimson/Red
+        neuro: {
+          950: '#0B0D10',
+          900: '#151A21',
+          850: '#1C232D',
+          800: '#202833',
+          750: '#283240',
+          700: '#323E4F',
+          600: '#4A5B73',
+          500: '#1677D2',
+          400: '#1E88E5',
+          300: '#64B5F6',
+          200: '#90CAF9',
+          100: '#DCE4ED',
+        },
+        // Standard BraTS 2021 segmentation colours - distinct and clinical
         brats: {
-          wt: '#eab308', // Amber / Gold
-          tc: '#ef4444', // Red / Crimson
-          et: '#06b6d4', // Cyan
-          ed: '#10b981', // Emerald
-          ncr: '#f97316', // Orange
+          wt: '#D97706', // Amber / Gold
+          tc: '#DC2626', // Red / Crimson
+          et: '#0284C7', // Technical Blue / Cyan
+          ed: '#10B981', // Emerald
+          ncr: '#EA580C', // Orange / Dark Red
         }
       },
       fontFamily: {
-        mono: ['Consolas', 'monospace'],
-        sans: ['system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
       }
     },
   },

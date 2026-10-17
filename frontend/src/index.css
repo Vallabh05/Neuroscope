@@ -4,30 +4,32 @@
 
 @layer base {
   body {
-    @apply bg-neuro-950 text-slate-100 antialiased font-sans;
+    background-color: #0B0D10;
+    color: #DCE4ED;
+    @apply antialiased font-sans;
   }
 }
 
-/* Custom fine-line scrollbars for medical workstation feel */
+/* Custom fine-line scrollbars for technical workstation feel */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #070b14;
+  background: #0B0D10;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e3258;
-  border-radius: 3px;
+  background: #202833;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3863a3;
+  background: #1677D2;
 }
 
-/* Indeterminate progress bar animation */
+/* Indeterminate progress bar animation with technical blue */
 @keyframes indeterminate {
   0% {
     transform: translateX(-100%);
@@ -41,7 +43,7 @@
 }
 
 .animate-indeterminate {
-  animation: indeterminate 2s cubic-bezier(0.65, 0.815, 0.735, 0.395) infinite;
+  animation: indeterminate 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 /* Canvas styling for medical slice viewer */
